@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
@@ -32,8 +32,8 @@ jobs:
       - name: Get Flutter packages
         run: flutter pub get
 
-     - name: Analyze Flutter project
-  run: flutter analyze lib --no-fatal-warnings
+      - name: Analyze Flutter project
+        run: flutter analyze lib --no-fatal-warnings
 
       - name: Build Flutter Web
         run: |
