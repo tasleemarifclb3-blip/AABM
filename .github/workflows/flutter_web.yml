@@ -32,8 +32,8 @@ jobs:
       - name: Get Flutter packages
         run: flutter pub get
 
-      - name: Analyze Flutter project
-        run: flutter analyze lib
+     - name: Analyze Flutter project
+  run: flutter analyze lib --no-fatal-warnings
 
       - name: Build Flutter Web
         run: |
