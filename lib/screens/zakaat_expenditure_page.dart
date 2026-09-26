@@ -1,0 +1,711 @@
+import 'dart:typed_data';
+
+import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../database/app_database.dart';
+import '../database/workflow_service.dart';
+import '../database/accounting_service.dart';
+import 'brand.dart';
+import 'available_balance_card.dart';
+import 'receipt_actions.dart';
+import 'security.dart';
+import 'signature_pad.dart';
+import 'app_ui.dart';
+
+class ZakaatExpenditurePage extends StatelessWidget {
+  final AppDatabase database;
+  const ZakaatExpenditurePage({super.key, required this.database});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Zakaat Expenditure')),
+      body: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AppPageHeader(
+            title: 'Zakaat Expenditure',
+            subtitle: 'Choose how the Zakaat assistance will be recorded',
+            icon: Icons.volunteer_activism_rounded,
+          ),
+          const AppSectionHeader(title: 'Expenditure Type'),
+          AppActionCard(
+            title: 'One-Time Recipient',
+            subtitle: 'Record a single Zakaat payment to a beneficiary',
+            icon: Icons.description_outlined,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ZakaatOneTimePage(database: database))),
+          ),
+          const SizedBox(height: 12),
+          AppActionCard(
+            title: 'Recurring Monthly Recipient',
+            subtitle: 'Record and manage recurring monthly Zakaat assistance',
+            icon: Icons.calendar_month_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ZakaatRecurringPage(database: database))),
+          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ZakaatOneTimePage extends StatefulWidget {
+  final AppDatabase database;
+  const ZakaatOneTimePage({super.key, required this.database});
+
+  @override
+  State<ZakaatOneTimePage> createState() => _ZakaatOneTimePageState();
+}
+
+class _ZakaatOneTimePageState extends State<ZakaatOneTimePage> {
+  final _name = TextEditingController();
+  final _address = TextEditingController();
+  final _aadhaar = TextEditingController();
+  final _phone = TextEditingController();
+  final _amount = TextEditingController();
+  final _reason = TextEditingController();
+  final _authority = TextEditingController();
+  final _cheque = TextEditingController();
+  final _verification = TextEditingController();
+  final _verifiedBy1 = TextEditingController();
+  final _verifiedBy2 = TextEditingController();
+  final _verifiedBy3 = TextEditingController();
+  final _remarks = TextEditingController();
+  DateTime _date = DateTime.now();
+  Uint8List? _recipientSignature;
+  Uint8List? _accountantSignature;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    for (final c in [_name, _address, _aadhaar, _phone, _amount, _reason, _authority, _cheque, _verification, _verifiedBy1, _verifiedBy2, _verifiedBy3]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  double _parse(String value) => double.tryParse(value.replaceAll(',', '').replaceAll('₹', '').trim()) ?? 0;
+
+  Future<double> _availableZakaat() async => AccountingService.availableZakaat(widget.database);
+
+  Future<String> _nextVoucher(String prefix) async {
+    final rows = await widget.database.select(widget.database.zakaatDisbursements).get();
+    var highest = 0;
+    for (final row in rows) {
+      final v = row.voucherNumber;
+      if (v == null || !v.startsWith(prefix)) continue;
+      final n = int.tryParse(v.substring(prefix.length));
+      if (n != null && n > highest) highest = n;
+    }
+    return '$prefix${(highest + 1).toString().padLeft(6, '0')}';
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(1950), lastDate: DateTime(now.year, now.month, now.day));
+    if (!mounted || picked == null) return;
+    setState(() => _date = DateTime(picked.year, picked.month, picked.day, now.hour, now.minute, now.second));
+  }
+
+  String? _validate(double amount) {
+    final fields = <String, String>{
+      'Recipient Name': _name.text.trim(),
+      'Address': _address.text.trim(),
+      'Aadhaar Card Number': _aadhaar.text.trim(),
+      'Phone Number': _phone.text.trim(),
+      'Amount': _amount.text.trim(),
+      'Reason': _reason.text.trim(),
+      'Issuing Authority / Report': _authority.text.trim(),
+      'Cheque Number': _cheque.text.trim(),
+      'Verification': _verification.text.trim(),
+      'Verified by 1': _verifiedBy1.text.trim(),
+      'Verified by 2': _verifiedBy2.text.trim(),
+      'Verified by 3': _verifiedBy3.text.trim(),
+    };
+    for (final e in fields.entries) {
+      if (e.value.isEmpty) return '${e.key} is required.';
+    }
+    if (!RegExp(r'^\d{12}$').hasMatch(_aadhaar.text)) return 'Aadhaar Card Number must contain exactly 12 digits.';
+    if (!RegExp(r'^\d{10}$').hasMatch(_phone.text)) return 'Phone Number must contain exactly 10 digits.';
+    if (amount <= 0) return 'Enter an amount greater than zero.';
+    if (_recipientSignature == null || _recipientSignature!.isEmpty) return 'Recipient signature / thumb impression is required.';
+    if (_accountantSignature == null || _accountantSignature!.isEmpty) return 'Accountant signature is required.';
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final amount = _parse(_amount.text);
+    final error = _validate(amount);
+    if (error != null) {
+      _show(error);
+      return;
+    }
+    final available = await _availableZakaat();
+    if (amount > available + .005) {
+      _show('Zakaat disbursement cannot exceed available Zakaat of ₹${available.toStringAsFixed(2)}.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final voucher = await _nextVoucher('ZK-OUT-');
+      await widget.database.into(widget.database.zakaatDisbursements).insert(
+        ZakaatDisbursementsCompanion.insert(
+          disbursementDate: Value(_date),
+          disbursementType: const Value('ONE_TIME'),
+          recipientName: _name.text.trim(),
+          recipientAddress: Value(_address.text.trim()),
+          aadhaarNumber: Value(_aadhaar.text.trim()),
+          phoneNumber: Value(_phone.text.trim()),
+          amount: amount,
+          amountInWords: Value(ReceiptActions.amountInWords(amount)),
+          reason: Value(_reason.text.trim()),
+          issuingAuthorityReport: Value(_authority.text.trim()),
+          chequeNumber: Value(_cheque.text.trim()),
+          paymentMode: 'Cheque',
+          voucherNumber: Value(voucher),
+          remarks: const Value(''),
+          verifiedBy1: Value(_verifiedBy1.text.trim()),
+          verifiedBy2: Value(_verifiedBy2.text.trim()),
+          verifiedBy3: Value(_verifiedBy3.text.trim()),
+          verification: Value(_verification.text.trim()),
+          recipientSignature: Value(_recipientSignature),
+          accountantSignature: Value(_accountantSignature),
+          username: Value(currentUsername ?? 'Legacy'),
+        ),
+      );
+      final saved = await (widget.database.select(widget.database.zakaatDisbursements)
+            ..where((d) => d.voucherNumber.equals(voucher)))
+          .getSingle();
+      await WorkflowService.requestChequeApproval(
+        widget.database,
+        sourceTable: 'zakaat_disbursements',
+        transactionId: saved.id,
+        requestedBy: currentUsername ?? 'Legacy',
+      );
+      if (!mounted) return;
+      await ReceiptActions.showActionsDialog(
+        context: context,
+        documentNumber: voucher,
+        title: 'Zakaat Voucher Generated',
+        fileNamePrefix: 'Zakaat-Voucher',
+        shareMessage: 'Al-Amin Baitul Maal - Zakaat Voucher $voucher\nRecipient: ${_name.text.trim()}\nAmount: INR ${amount.toStringAsFixed(2)}',
+        buildPdf: () => ReceiptActions.zakaatVoucherDocument(
+          voucherNumber: voucher,
+          date: _date,
+          recipientName: _name.text.trim(),
+          address: _address.text.trim(),
+          aadhaar: _aadhaar.text.trim(),
+          phone: _phone.text.trim(),
+          amount: amount,
+          reason: _reason.text.trim(),
+          authority: _authority.text.trim(),
+          cheque: _cheque.text.trim(),
+          paymentMode: 'Cheque',
+          verification: _verification.text.trim(),
+          verifiedBy1: _verifiedBy1.text.trim(),
+          verifiedBy2: _verifiedBy2.text.trim(),
+          verifiedBy3: _verifiedBy3.text.trim(),
+          remarks: '',
+          recipientSignature: _recipientSignature,
+          accountantSignature: _accountantSignature,
+          preparedBy: currentUsername,
+        ).save(),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) _show('Could not save Zakaat voucher: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _verifierDropdown(String label, TextEditingController controller) {
+    final current = kUserPasswords.containsKey(controller.text) ? controller.text : null;
+    return DropdownButtonFormField<String>(
+      initialValue: current,
+      decoration: _d(label),
+      items: kUserPasswords.keys.map((name) => DropdownMenuItem<String>(value: name, child: Text(name))).toList(),
+      onChanged: _saving ? null : (value) => setState(() => controller.text = value ?? ''),
+    );
+  }
+
+  void _show(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Color _fieldFill(String label) {
+    final text = label.toLowerCase();
+    if (text.contains('name') || text.contains('borrower') || text.contains('recipient')) {
+      return const Color(0xFFEAF4F0);
+    }
+    if (text.contains('parentage') || text.contains('authority') || text.contains('report')) {
+      return const Color(0xFFF5EFE1);
+    }
+    if (text.contains('address')) return const Color(0xFFEEF2F7);
+    if (text.contains('aadhaar')) return const Color(0xFFF8EEE7);
+    if (text.contains('phone')) return const Color(0xFFF0EBF7);
+    if (text.contains('date') || text.contains('month')) return const Color(0xFFEAF0F8);
+    if (text.contains('amount')) return const Color(0xFFEAF6EA);
+    if (text.contains('cheque') || text.contains('reference')) return const Color(0xFFF5EAF1);
+    if (text.contains('verification')) return const Color(0xFFF4F0E8);
+    if (text.contains('verified')) return const Color(0xFFEDF5F1);
+    if (text.contains('remarks')) return const Color(0xFFF1F1F1);
+    if (text.contains('reason')) return const Color(0xFFF9F1E8);
+    return const Color(0xFFF7F7F7);
+  }
+
+  InputDecoration _d(String label) => InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        filled: true,
+        fillColor: _fieldFill(label),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = _parse(_amount.text);
+    return Scaffold(
+      appBar: AppBar(title: const Text('One-Time Zakaat Recipient')),
+      body: AppDesktopShell(selected: 'Zakaat', child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 900;
+          final width = wide ? 980.0 : 680.0;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: width),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AppPageHeader(
+                      title: 'One-Time Zakaat Recipient',
+                      subtitle: 'Beneficiary details and Zakaat expenditure voucher',
+                      icon: Icons.volunteer_activism_rounded,
+                    ),
+                    AvailableBalanceCard(label: 'Available Zakaat Balance', future: _availableZakaat()),
+                    const SizedBox(height: 14),
+                    AppFormSection(
+                      title: 'Personal Details',
+                      icon: Icons.person_outline_rounded,
+                      child: Column(
+                        children: [
+                          TextField(controller: _name, enabled: !_saving, decoration: _d('Recipient Name *')),
+                          const SizedBox(height: 12),
+                          TextField(controller: _address, enabled: !_saving, maxLines: 2, decoration: _d('Address *')),
+                          const SizedBox(height: 12),
+                          if (wide)
+                            Row(children: [
+                              Expanded(child: TextField(controller: _aadhaar, enabled: !_saving, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)], maxLength: 12, decoration: _d('Aadhaar Card Number (12 digits) *'))),
+                              const SizedBox(width: 12),
+                              Expanded(child: TextField(controller: _phone, enabled: !_saving, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)], maxLength: 10, decoration: _d('Phone Number (10 digits) *'))),
+                            ])
+                          else ...[
+                            TextField(controller: _aadhaar, enabled: !_saving, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)], maxLength: 12, decoration: _d('Aadhaar Card Number (12 digits) *')),
+                            const SizedBox(height: 12),
+                            TextField(controller: _phone, enabled: !_saving, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)], maxLength: 10, decoration: _d('Phone Number (10 digits) *')),
+                          ],
+                        ],
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Voucher Details',
+                      icon: Icons.description_outlined,
+                      child: Column(
+                        children: [
+                          InkWell(
+                            onTap: _saving ? null : _pickDate,
+                            child: InputDecorator(
+                              decoration: _d('Transaction Date *'),
+                              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(ReceiptActions.formatDate(_date)), const Icon(Icons.calendar_today_outlined)]),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(controller: _cheque, enabled: !_saving, decoration: _d('Cheque Number *')),
+                          const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.account_balance_outlined, color: kBrandGreen), title: Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('Cheque — fixed for Zakaat issue')),
+                        ],
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Amount & Purpose',
+                      icon: Icons.payments_outlined,
+                      child: Column(
+                        children: [
+                          TextField(controller: _amount, enabled: !_saving, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() {}), decoration: _d('Amount *').copyWith(prefixText: '₹ ')),
+                          if (amount > 0) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: kBrandCream, borderRadius: BorderRadius.circular(12), border: Border.all(color: kBrandGold.withValues(alpha: .45))),
+                              child: Text('Amount in Words: ${ReceiptActions.amountInWords(amount)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          TextField(controller: _reason, enabled: !_saving, maxLines: 4, decoration: _d('Reason *').copyWith(alignLabelWithHint: true)),
+                          const SizedBox(height: 12),
+                          TextField(controller: _authority, enabled: !_saving, maxLines: 4, decoration: _d('Issuing Authority / Report *').copyWith(alignLabelWithHint: true)),
+                        ],
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Verification',
+                      icon: Icons.verified_user_outlined,
+                      child: Column(
+                        children: [
+                          TextField(controller: _verification, enabled: !_saving, maxLines: 7, decoration: _d('Verification *').copyWith(alignLabelWithHint: true)),
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            Expanded(child: _verifierDropdown('Verified by 1 *', _verifiedBy1)),
+                            const SizedBox(width: 10),
+                            Expanded(child: _verifierDropdown('Verified by 2 *', _verifiedBy2)),
+                            const SizedBox(width: 10),
+                            Expanded(child: _verifierDropdown('Verified by 3 *', _verifiedBy3)),
+                          ]),
+                        ],
+                      ),
+                    ),
+                    AppFormSection(
+                      title: 'Signatures',
+                      icon: Icons.draw_outlined,
+                      child: Column(
+                        children: [
+                          SignaturePad(label: 'Recipient Signature / Thumb Impression *', onChanged: (bytes) => setState(() => _recipientSignature = bytes)),
+                          const SizedBox(height: 12),
+                          SignaturePad(label: 'Accountant Signature *', onChanged: (bytes) => setState(() => _accountantSignature = bytes)),
+                        ],
+                      ),
+                    ),
+                    FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_rounded), label: Text(_saving ? 'Saving...' : 'Save Zakaat Voucher')),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      )),
+    );
+  }
+
+}
+
+class ZakaatRecurringPage extends StatefulWidget {
+  final AppDatabase database;
+  const ZakaatRecurringPage({super.key, required this.database});
+
+  @override
+  State<ZakaatRecurringPage> createState() => _ZakaatRecurringPageState();
+}
+
+class _ZakaatRecurringPageState extends State<ZakaatRecurringPage> {
+  List<ZakaatBeneficiary> _beneficiaries = [];
+  ZakaatBeneficiary? _selected;
+  final _name = TextEditingController();
+  final _address = TextEditingController();
+  final _aadhaar = TextEditingController();
+  final _phone = TextEditingController();
+  final _amount = TextEditingController();
+  final _cheque = TextEditingController();
+  final _verification = TextEditingController();
+  final _verifiedBy1 = TextEditingController();
+  final _verifiedBy2 = TextEditingController();
+  final _verifiedBy3 = TextEditingController();
+  final _remarks = TextEditingController();
+  DateTime _date = DateTime.now();
+  Uint8List? _recipientSignature;
+  Uint8List? _accountantSignature;
+  bool _saving = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBeneficiaries();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_name, _address, _aadhaar, _phone, _amount, _cheque, _verification, _verifiedBy1, _verifiedBy2, _verifiedBy3]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadBeneficiaries() async {
+    try {
+      final rows = await (widget.database.select(widget.database.zakaatBeneficiaries)..where((b) => b.isActive.equals(true))).get();
+      if (!mounted) return;
+      setState(() {
+        _beneficiaries = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _show('Could not load beneficiaries: $e');
+    }
+  }
+
+  void _loadSelected(ZakaatBeneficiary? value) {
+    setState(() {
+      _selected = value;
+      _name.text = value?.name ?? '';
+      _address.text = value?.address ?? '';
+      _aadhaar.text = value?.aadhaarNumber ?? '';
+      _phone.text = value?.phoneNumber ?? '';
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(1950), lastDate: DateTime(now.year, now.month, now.day));
+    if (!mounted || picked == null) return;
+    setState(() => _date = DateTime(picked.year, picked.month, picked.day, now.hour, now.minute, now.second));
+  }
+
+  Future<double> _availableZakaat() async => AccountingService.availableZakaat(widget.database);
+
+  Future<String> _nextVoucher() async {
+    final rows = await widget.database.select(widget.database.zakaatDisbursements).get();
+    var highest = 0;
+    for (final r in rows) {
+      final v = r.voucherNumber;
+      if (v == null || !v.startsWith('ZK-MON-')) continue;
+      final n = int.tryParse(v.substring('ZK-MON-'.length));
+      if (n != null && n > highest) highest = n;
+    }
+    return 'ZK-MON-${(highest + 1).toString().padLeft(6, '0')}';
+  }
+
+  String _monthName(int month) => const ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][month - 1];
+
+  String? _validate(double amount) {
+    final fields = <String, String>{
+      'Recipient Name': _name.text.trim(),
+      'Address': _address.text.trim(),
+      'Aadhaar Card Number': _aadhaar.text.trim(),
+      'Phone Number': _phone.text.trim(),
+      'Amount': _amount.text.trim(),
+      'Cheque Number': _cheque.text.trim(),
+      'Verification': _verification.text.trim(),
+      'Verified by 1': _verifiedBy1.text.trim(),
+      'Verified by 2': _verifiedBy2.text.trim(),
+      'Verified by 3': _verifiedBy3.text.trim(),
+    };
+    for (final e in fields.entries) {
+      if (e.value.isEmpty) return '${e.key} is required.';
+    }
+    if (!RegExp(r'^\d{12}$').hasMatch(_aadhaar.text)) return 'Aadhaar Card Number must contain exactly 12 digits.';
+    if (!RegExp(r'^\d{10}$').hasMatch(_phone.text)) return 'Phone Number must contain exactly 10 digits.';
+    if (amount <= 0) return 'Enter an amount greater than zero.';
+    if (_recipientSignature == null || _recipientSignature!.isEmpty) return 'Recipient signature / thumb impression is required.';
+    if (_accountantSignature == null || _accountantSignature!.isEmpty) return 'Accountant signature is required.';
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final amount = double.tryParse(_amount.text.replaceAll(',', '').replaceAll('₹', '').trim()) ?? 0;
+    final error = _validate(amount);
+    if (error != null) {
+      _show(error);
+      return;
+    }
+    final available = await _availableZakaat();
+    if (amount > available + .005) {
+      _show('Zakaat disbursement cannot exceed available Zakaat of ₹${available.toStringAsFixed(2)}.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final voucher = await _nextVoucher();
+      var beneficiaryId = _selected?.id;
+      beneficiaryId ??= await widget.database.into(widget.database.zakaatBeneficiaries).insert(
+          ZakaatBeneficiariesCompanion.insert(
+            name: _name.text.trim(),
+            address: Value(_address.text.trim()),
+            aadhaarNumber: Value(_aadhaar.text.trim()),
+            phoneNumber: Value(_phone.text.trim()),
+          ),
+        );
+      await widget.database.into(widget.database.zakaatDisbursements).insert(
+        ZakaatDisbursementsCompanion.insert(
+          beneficiaryId: Value(beneficiaryId),
+          disbursementDate: Value(_date),
+          disbursementType: const Value('RECURRING_MONTHLY'),
+          recipientName: _name.text.trim(),
+          recipientAddress: Value(_address.text.trim()),
+          aadhaarNumber: Value(_aadhaar.text.trim()),
+          phoneNumber: Value(_phone.text.trim()),
+          amount: amount,
+          amountInWords: Value(ReceiptActions.amountInWords(amount)),
+          reason: Value('Recurring Monthly Zakaat — ${_monthName(_date.month)} ${_date.year}'),
+          issuingAuthorityReport: Value('Monthly beneficiary record'),
+          chequeNumber: Value(_cheque.text.trim()),
+          paymentMode: 'Cheque',
+          voucherNumber: Value(voucher),
+          remarks: const Value(''),
+          verifiedBy1: Value(_verifiedBy1.text.trim()),
+          verifiedBy2: Value(_verifiedBy2.text.trim()),
+          verifiedBy3: Value(_verifiedBy3.text.trim()),
+          verification: Value(_verification.text.trim()),
+          recipientSignature: Value(_recipientSignature),
+          accountantSignature: Value(_accountantSignature),
+          username: Value(currentUsername ?? 'Legacy'),
+        ),
+      );
+      final saved = await (widget.database.select(widget.database.zakaatDisbursements)
+            ..where((d) => d.voucherNumber.equals(voucher)))
+          .getSingle();
+      await WorkflowService.requestChequeApproval(
+        widget.database,
+        sourceTable: 'zakaat_disbursements',
+        transactionId: saved.id,
+        requestedBy: currentUsername ?? 'Legacy',
+      );
+
+      if (!mounted) return;
+      await ReceiptActions.showActionsDialog(
+        context: context,
+        documentNumber: voucher,
+        title: 'Recurring Zakaat Voucher Generated',
+        fileNamePrefix: 'Zakaat-Monthly',
+        shareMessage: 'Al-Amin Baitul Maal - Monthly Zakaat Voucher $voucher\nRecipient: ${_name.text.trim()}\nAmount: INR ${amount.toStringAsFixed(2)}',
+        buildPdf: () => ReceiptActions.zakaatVoucherDocument(
+          voucherNumber: voucher,
+          date: _date,
+          recipientName: _name.text.trim(),
+          address: _address.text.trim(),
+          aadhaar: _aadhaar.text.trim(),
+          phone: _phone.text.trim(),
+          amount: amount,
+          reason: 'Recurring Monthly Zakaat — ${_monthName(_date.month)} ${_date.year}',
+          authority: 'Monthly beneficiary record',
+          cheque: _cheque.text.trim(),
+          paymentMode: 'Cheque',
+          verification: _verification.text.trim(),
+          verifiedBy1: _verifiedBy1.text.trim(),
+          verifiedBy2: _verifiedBy2.text.trim(),
+          verifiedBy3: _verifiedBy3.text.trim(),
+          remarks: '',
+          recipientSignature: _recipientSignature,
+          accountantSignature: _accountantSignature,
+          preparedBy: currentUsername,
+        ).save(),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) _show('Could not save recurring Zakaat voucher: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _verifierDropdown(String label, TextEditingController controller) {
+    final current = kUserPasswords.containsKey(controller.text) ? controller.text : null;
+    return DropdownButtonFormField<String>(
+      initialValue: current,
+      decoration: _d(label),
+      items: kUserPasswords.keys.map((name) => DropdownMenuItem<String>(value: name, child: Text(name))).toList(),
+      onChanged: _saving ? null : (value) => setState(() => controller.text = value ?? ''),
+    );
+  }
+
+  void _show(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Color _fieldFill(String label) {
+    final text = label.toLowerCase();
+    if (text.contains('name') || text.contains('borrower') || text.contains('recipient')) {
+      return const Color(0xFFEAF4F0);
+    }
+    if (text.contains('parentage') || text.contains('authority') || text.contains('report')) {
+      return const Color(0xFFF5EFE1);
+    }
+    if (text.contains('address')) return const Color(0xFFEEF2F7);
+    if (text.contains('aadhaar')) return const Color(0xFFF8EEE7);
+    if (text.contains('phone')) return const Color(0xFFF0EBF7);
+    if (text.contains('date') || text.contains('month')) return const Color(0xFFEAF0F8);
+    if (text.contains('amount')) return const Color(0xFFEAF6EA);
+    if (text.contains('cheque') || text.contains('reference')) return const Color(0xFFF5EAF1);
+    if (text.contains('verification')) return const Color(0xFFF4F0E8);
+    if (text.contains('verified')) return const Color(0xFFEDF5F1);
+    if (text.contains('remarks')) return const Color(0xFFF1F1F1);
+    if (text.contains('reason')) return const Color(0xFFF9F1E8);
+    return const Color(0xFFF7F7F7);
+  }
+
+  InputDecoration _d(String label) => InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        filled: true,
+        fillColor: _fieldFill(label),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final amount = double.tryParse(_amount.text.replaceAll(',', '').replaceAll('₹', '').trim()) ?? 0;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Recurring Monthly Zakaat')),
+      body: AppDesktopShell(selected: 'Zakaat', child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const AppPageHeader(
+            title: 'Recurring Monthly Zakaat',
+            subtitle: 'Record recurring assistance and beneficiary details',
+            icon: Icons.calendar_month_rounded,
+          ),
+          AvailableBalanceCard(
+            label: 'Available Zakaat Balance',
+            future: _availableZakaat(),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<int>(
+            initialValue: _selected?.id,
+            decoration: _d('Existing Beneficiary (optional) — selecting one fills the fields'),
+            items: _beneficiaries.map((b) => DropdownMenuItem<int>(value: b.id, child: Text(b.name))).toList(),
+            onChanged: _saving ? null : (value) => _loadSelected(value == null ? null : _beneficiaries.firstWhere((b) => b.id == value)),
+          ),
+          const SizedBox(height: 12),
+          TextField(controller: _name, enabled: !_saving, decoration: _d('Recipient Name *')),
+          const SizedBox(height: 12),
+          TextField(controller: _address, enabled: !_saving, maxLines: 3, decoration: _d('Address *')),
+          const SizedBox(height: 12),
+          TextField(controller: _aadhaar, enabled: !_saving, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)], maxLength: 12, decoration: _d('Aadhaar Card Number (12 digits) *')),
+          const SizedBox(height: 12),
+          TextField(controller: _phone, enabled: !_saving, keyboardType: TextInputType.phone, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)], maxLength: 10, decoration: _d('Phone Number (10 digits) *')),
+          const SizedBox(height: 12),
+          InkWell(onTap: _saving ? null : _pickDate, child: InputDecorator(decoration: _d('Month / Transaction Date *'), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('${_monthName(_date.month)} ${_date.year}'), const Icon(Icons.calendar_today_outlined)]))),
+          const SizedBox(height: 12),
+          TextField(controller: _amount, enabled: !_saving, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() {}), decoration: _d('Amount *').copyWith(prefixText: '₹ ')),
+          if (amount > 0) ...[
+            const SizedBox(height: 6),
+            Card(child: Padding(padding: const EdgeInsets.all(10), child: Text('Amount in Words: ${ReceiptActions.amountInWords(amount)}', style: const TextStyle(fontWeight: FontWeight.w600)))),
+          ],
+          const SizedBox(height: 12),
+          TextField(controller: _cheque, enabled: !_saving, decoration: _d('Cheque Number *')),
+          const SizedBox(height: 12),
+          const ListTile(leading: Icon(Icons.account_balance_outlined), title: Text('Payment Mode'), subtitle: Text('Cheque — fixed for Zakaat issue')),
+          TextField(controller: _verification, enabled: !_saving, maxLines: 8, decoration: _d('Verification * (8 lines)').copyWith(alignLabelWithHint: true)),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _verifierDropdown('Verified by 1 *', _verifiedBy1)),
+            const SizedBox(width: 8),
+            Expanded(child: _verifierDropdown('Verified by 2 *', _verifiedBy2)),
+            const SizedBox(width: 8),
+            Expanded(child: _verifierDropdown('Verified by 3 *', _verifiedBy3)),
+          ]),
+          const SizedBox(height: 12),
+          const SizedBox(height: 12),
+          SignaturePad(label: 'Recipient Signature / Thumb Impression *', onChanged: (bytes) => setState(() => _recipientSignature = bytes)),
+          const SizedBox(height: 12),
+          SignaturePad(label: 'Accountant Signature *', onChanged: (bytes) => setState(() => _accountantSignature = bytes)),
+          const SizedBox(height: 14),
+          FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save), label: Text(_saving ? 'Saving...' : 'Save Monthly Voucher')),
+        ]),
+      )),
+    );
+  }
+}

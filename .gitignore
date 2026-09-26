@@ -1,0 +1,49 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Android generated files
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/key.properties
+
+# iOS generated files
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+
+# Web generated files
+web/.dart_tool/
+
+# macOS generated files
+macos/Pods/
+macos/Flutter/ephemeral/
+
+# Windows generated files
+windows/flutter/ephemeral/
+
+# Linux generated files
+linux/flutter/ephemeral/
+
+# Generated reports / logs
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db

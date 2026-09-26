@@ -1,0 +1,1404 @@
+import 'dart:typed_data';
+
+import 'package:cross_file/cross_file.dart';
+import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+
+import 'brand.dart';
+
+class ReceiptActions {
+  static String formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  /// Indian-numbering amount in words, suitable for receipts/vouchers.
+  /// Example: 1250.50 -> "Rupees One Thousand Two Hundred Fifty and Paise Fifty Only".
+  static String amountInWords(double value) {
+    if (!value.isFinite || value < 0) return 'Rupees Zero Only';
+    final roundedPaise = (value * 100).round();
+    var rupees = roundedPaise ~/ 100;
+    final paise = roundedPaise % 100;
+
+    String underHundred(int n) {
+      const ones = [
+        '',
+        'One',
+        'Two',
+        'Three',
+        'Four',
+        'Five',
+        'Six',
+        'Seven',
+        'Eight',
+        'Nine',
+        'Ten',
+        'Eleven',
+        'Twelve',
+        'Thirteen',
+        'Fourteen',
+        'Fifteen',
+        'Sixteen',
+        'Seventeen',
+        'Eighteen',
+        'Nineteen',
+      ];
+      const tens = [
+        '',
+        '',
+        'Twenty',
+        'Thirty',
+        'Forty',
+        'Fifty',
+        'Sixty',
+        'Seventy',
+        'Eighty',
+        'Ninety',
+      ];
+      if (n < 20) return ones[n];
+      return '${tens[n ~/ 10]}${n % 10 == 0 ? '' : ' ${ones[n % 10]}'}';
+    }
+
+    String integerWords(int n) {
+      if (n == 0) return 'Zero';
+      final parts = <String>[];
+      if (n >= 10000000) {
+        parts.add('${integerWords(n ~/ 10000000)} Crore');
+        n %= 10000000;
+      }
+      if (n >= 100000) {
+        parts.add('${integerWords(n ~/ 100000)} Lakh');
+        n %= 100000;
+      }
+      if (n >= 1000) {
+        parts.add('${integerWords(n ~/ 1000)} Thousand');
+        n %= 1000;
+      }
+      if (n >= 100) {
+        parts.add('${underHundred(n ~/ 100)} Hundred');
+        n %= 100;
+      }
+      if (n > 0) parts.add(underHundred(n));
+      return parts.join(' ');
+    }
+
+    // Protect against an accidental negative zero after rounding.
+    if (rupees == 0 && paise == 0) return 'Rupees Zero Only';
+    final rupeePart = 'Rupees ${integerWords(rupees)}';
+    final paisePart = paise == 0 ? '' : ' and Paise ${underHundred(paise)}';
+    return '$rupeePart$paisePart Only';
+  }
+
+  static Future<void> printPdf({required Uint8List bytes, required String fileName}) async {
+    await Printing.layoutPdf(onLayout: (_) async => bytes, name: fileName);
+  }
+
+  static Future<void> sharePdf({
+    required Uint8List bytes,
+    required String fileName,
+    required String message,
+  }) async {
+    await SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        files: [XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName)],
+        fileNameOverrides: [fileName],
+      ),
+    );
+  }
+
+  static Future<void> showActionsDialog({
+    required BuildContext context,
+    required String documentNumber,
+    required Future<Uint8List> Function() buildPdf,
+    required String shareMessage,
+    String title = 'Document Generated',
+    String fileNamePrefix = 'Document',
+  }) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text('No: $documentNumber'),
+        actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.print),
+            label: const Text('Print / Save PDF'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                final bytes = await buildPdf();
+                await printPdf(bytes: bytes, fileName: '$fileNamePrefix-$documentNumber.pdf');
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not print PDF: $e')));
+                }
+              }
+            },
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.share),
+            label: const Text('Send via WhatsApp'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                final bytes = await buildPdf();
+                await sharePdf(
+                  bytes: bytes,
+                  fileName: '$fileNamePrefix-$documentNumber.pdf',
+                  message: shareMessage,
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not share PDF: $e')));
+                }
+              }
+            },
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Compact two-column row used by thermal receipts across the app.
+  static pw.TableRow thermalRow(String label, String value) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+          child: pw.Text(
+            value,
+            style: const pw.TextStyle(fontSize: 7.5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static pw.Document thermalReceiptDocument({
+    required String title,
+    required String documentNumber,
+    required DateTime date,
+    required List<pw.TableRow> rows,
+    String? amountWords,
+    String? remarks,
+    String? outstanding,
+    String? totalSettled,
+    String? balanceRemaining,
+  }) {
+    final document = pw.Document();
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat(80 * PdfPageFormat.mm, 180 * PdfPageFormat.mm),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        build: (_) => [
+          pw.Container(
+            padding: const pw.EdgeInsets.all(7),
+            decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.0, color: PdfColors.black)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Center(child: pw.Image(brandPdfLogo, width: 62, height: 62, fit: pw.BoxFit.contain)),
+                pw.SizedBox(height: 3),
+                pw.Text('AL-AMIN BAITUL MAAL TRUST', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Regd. No. 5767', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Dangerpora, Malla Bagh, Srinagar', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7)),
+                pw.Divider(),
+                pw.Text(title, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 4),
+                pw.Text('No: $documentNumber', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Date: ${formatDate(date)}', style: const pw.TextStyle(fontSize: 8)),
+                pw.SizedBox(height: 5),
+                pw.Table(border: pw.TableBorder.all(width: .5), children: rows),
+                if (amountWords != null && amountWords.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 7),
+                  pw.Text('Amount in Words', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 2),
+                  pw.Text(amountWords.trim(), style: const pw.TextStyle(fontSize: 8)),
+                ],
+                if (totalSettled != null && totalSettled.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Text('Total Settled: $totalSettled', textAlign: pw.TextAlign.left, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                ],
+                if (outstanding != null) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Text('OUTSTANDING: $outstanding', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ],
+                if (balanceRemaining != null && balanceRemaining.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Text('Balance Remaining: $balanceRemaining', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                ],
+                if (remarks != null && remarks.trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 5),
+                  pw.Text('Remarks: $remarks', style: const pw.TextStyle(fontSize: 8)),
+                ],
+                pw.SizedBox(height: 12),
+                pw.Text('Thank you', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return document;
+  }
+
+  static pw.TableRow pdfRow(String label, String value) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(7),
+          color: PdfColor.fromHex('#EEF4F1'),
+          child: pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        ),
+        pw.Padding(padding: const pw.EdgeInsets.all(7), child: pw.Text(value)),
+      ],
+    );
+  }
+
+  static pw.Widget _linedArea(String value, {int lines = 1, double lineHeight = 15}) {
+    final safeLines = lines < 1 ? 1 : lines;
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(5),
+      decoration: pw.BoxDecoration(border: pw.Border.all(width: .5, color: PdfColors.grey600)),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Text(value.trim().isEmpty ? ' ' : value.trim(), style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 3),
+          ...List.generate(
+            safeLines,
+            (_) => pw.Container(
+              height: lineHeight,
+              decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: .35, color: PdfColors.grey500))),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.TableRow _linedRow(String label, String value, {int lines = 1}) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(6),
+          color: PdfColor.fromHex('#EEF4F1'),
+          child: pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+        ),
+        _linedArea(value, lines: lines),
+      ],
+    );
+  }
+
+  static pw.Widget _signature(String label, Uint8List? bytes) {
+    return pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        if (bytes != null && bytes.isNotEmpty)
+          pw.Container(height: 58, width: 160, child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain))
+        else
+          pw.SizedBox(height: 58),
+        pw.SizedBox(height: 4),
+        pw.Text(label, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 9)),
+        pw.SizedBox(height: 16),
+      ],
+    );
+  }
+
+  static pw.Document baseDocument({
+    required String title,
+    required String documentNumber,
+    required String date,
+    required List<pw.TableRow> rows,
+    String? remarks,
+    String footer = 'This document is generated from the saved accounting transaction.',
+    String leftSignature = 'Authorized Signature: __________________',
+    String rightSignature = 'Thank you',
+    bool largeHeader = false,
+  }) {
+    final document = pw.Document();
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (_) => pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(width: 1.2, color: PdfColors.black),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pdfBrandHeader(documentTitle: title, large: largeHeader),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [pw.Text('No: $documentNumber'), pw.Text('Date: $date')],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Table(
+                border: pw.TableBorder.all(width: .7),
+                columnWidths: const {0: pw.FlexColumnWidth(1.45), 1: pw.FlexColumnWidth(2.55)},
+                children: rows,
+              ),
+              if (remarks != null && remarks.trim().isNotEmpty) ...[
+                pw.SizedBox(height: 12),
+                pw.Text('Remarks', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 4),
+                pw.Text(remarks),
+              ],
+              pw.Spacer(),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+              pw.Text(footer, textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 9)),
+              pw.SizedBox(height: 26),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [pw.Text(leftSignature), pw.Text(rightSignature)],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return document;
+  }
+
+  static pw.Document ledgerDocument({required String title, required List<List<String>> rows, bool includeRemarks = true}) {
+    final document = pw.Document();
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(18),
+        build: (_) => [
+          pdfBrandHeader(documentTitle: title, large: false),
+          pw.Table(
+            border: pw.TableBorder.all(width: .5),
+            columnWidths: includeRemarks
+                ? const {
+                    0: pw.FixedColumnWidth(52),
+                    1: pw.FixedColumnWidth(58),
+                    2: pw.FixedColumnWidth(62),
+                    3: pw.FixedColumnWidth(78),
+                    4: pw.FlexColumnWidth(2.0),
+                    5: pw.FixedColumnWidth(70),
+                    6: pw.FixedColumnWidth(78),
+                    7: pw.FixedColumnWidth(55),
+                  }
+                : const {
+                    0: pw.FixedColumnWidth(58),
+                    1: pw.FixedColumnWidth(62),
+                    2: pw.FixedColumnWidth(68),
+                    3: pw.FixedColumnWidth(82),
+                    4: pw.FixedColumnWidth(78),
+                    5: pw.FixedColumnWidth(82),
+                    6: pw.FixedColumnWidth(58),
+                  },
+            children: [
+              pw.TableRow(
+                children: (includeRemarks
+                        ? ['Date', 'Amount', 'Debit/Credit', 'Receipt No.', 'Remarks', 'Type', 'Running Balance', 'Username']
+                        : ['Date', 'Amount', 'Debit/Credit', 'Receipt No.', 'Type', 'Running Balance', 'Username'])
+                    .map((v) => pw.Container(
+                          padding: const pw.EdgeInsets.all(4),
+                          color: PdfColor.fromHex('#145A4A'),
+                          child: pw.Text(v, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8)),
+                        ))
+                    .toList(),
+              ),
+              ...rows.map((row) => pw.TableRow(
+                    children: row.map((v) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(v, style: const pw.TextStyle(fontSize: 7.5)),
+                        )).toList(),
+                  )),
+            ],
+          ),
+        ],
+      ),
+    );
+    return document;
+  }
+
+  static pw.Document qarzaVoucherDocument({
+    required String documentNumber,
+    required DateTime date,
+    required String party,
+    required String address,
+    String parentage = '',
+    required String aadhaar,
+    required String phone,
+    required double amount,
+    required String chequeNumber,
+    required String paymentMode,
+    required String operation,
+    String verification = '',
+    String verifiedBy1 = '',
+    String verifiedBy2 = '',
+    String verifiedBy3 = '',
+    required String remarks,
+    Uint8List? recipientSignature,
+    Uint8List? accountantSignature,
+    String? preparedBy,
+    String? conditions,
+  }) {
+    final document = pw.Document();
+    final isIssue = operation.toUpperCase() == 'ISSUE';
+
+    pw.Widget fieldCell(
+      String label,
+      String value, {
+      bool boldValue = false,
+      PdfColor fill = PdfColors.white,
+      int maxLines = 1,
+    }) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        color: fill,
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 7.0,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 1.5),
+            pw.Text(
+              value.trim().isEmpty ? '—' : value.trim(),
+              maxLines: maxLines,
+              overflow: pw.TextOverflow.clip,
+              style: pw.TextStyle(
+                fontSize: 8.2,
+                fontWeight:
+                    boldValue ? pw.FontWeight.bold : pw.FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget plainWritingBox(
+      String label,
+      String value, {
+      required int lines,
+    }) {
+      final height = lines == 4 ? 43.0 : 27.0;
+      return pw.Container(
+        height: height,
+        padding: const pw.EdgeInsets.fromLTRB(5, 4, 5, 4),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(width: .6, color: PdfColors.grey700),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 8.0,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Expanded(
+              child: pw.Text(
+                value.trim(),
+                maxLines: lines,
+                overflow: pw.TextOverflow.clip,
+                style: const pw.TextStyle(fontSize: 8.0),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget verifierCell(String label, String name) {
+      return pw.Container(
+        height: 42,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: pw.Column(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 6.8,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              name.trim().isEmpty ? ' ' : name.trim(),
+              textAlign: pw.TextAlign.center,
+              maxLines: 1,
+              overflow: pw.TextOverflow.clip,
+              style: const pw.TextStyle(fontSize: 7.5),
+            ),
+            pw.SizedBox(height: 3),
+            pw.Container(
+              width: double.infinity,
+              height: 9,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(bottom: pw.BorderSide(width: .4)),
+              ),
+            ),
+            pw.SizedBox(height: 1),
+            pw.Text('Signature', style: const pw.TextStyle(fontSize: 6.2)),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget signatureBox(String label, Uint8List? bytes) {
+      return pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          if (bytes != null && bytes.isNotEmpty)
+            pw.Container(
+              height: 30,
+              width: 145,
+              child: pw.Image(
+                pw.MemoryImage(bytes),
+                fit: pw.BoxFit.contain,
+              ),
+            )
+          else
+            pw.SizedBox(height: 30),
+          pw.Container(
+            width: 145,
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(width: .5)),
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            label,
+            textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 7.2),
+          ),
+        ],
+      );
+    }
+
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(18, 12, 18, 12),
+        build: (_) => pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(width: 1.0),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pdfBrandHeader(
+                documentTitle: isIssue
+                    ? 'QARZ-E-HASSANAH ISSUE VOUCHER'
+                    : 'QARZ-E-HASSANAH RECOVERY VOUCHER',
+                large: false,
+              ),
+              pw.SizedBox(height: 2),
+
+              // Date and form number in one row.
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Document / Form No.',
+                        documentNumber,
+                        boldValue: true,
+                        fill: PdfColor.fromHex('#EAF4F0'),
+                      ),
+                      fieldCell(
+                        'Date',
+                        formatDate(date),
+                        fill: PdfColor.fromHex('#F6F0E3'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              // Party, parentage and exactly two address lines.
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Borrower / Party',
+                        party,
+                        fill: PdfColor.fromHex('#EDF5F1'),
+                      ),
+                      fieldCell(
+                        'Parentage',
+                        parentage,
+                        fill: PdfColor.fromHex('#F5EFE1'),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Address',
+                        address,
+                        fill: PdfColor.fromHex('#EEF2F7'),
+                        maxLines: 2,
+                      ),
+                      pw.Container(
+                        color: PdfColor.fromHex('#EEF2F7'),
+                        height: 34,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              // Aadhaar and phone in one row.
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Aadhaar Card No.',
+                        aadhaar,
+                        fill: PdfColor.fromHex('#F8EEE7'),
+                      ),
+                      fieldCell(
+                        'Phone Number',
+                        phone,
+                        fill: PdfColor.fromHex('#F0EBF7'),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        isIssue ? 'Amount Borrowed' : 'Amount Returned',
+                        'INR ${amount.toStringAsFixed(2)}',
+                        boldValue: true,
+                        fill: PdfColor.fromHex('#EAF6EA'),
+                      ),
+                      fieldCell(
+                        'Transaction Type',
+                        isIssue ? 'Qarz Issued' : 'Qarz Recovered',
+                        fill: PdfColor.fromHex('#EAF0F8'),
+                      ),
+                    ],
+                  ),
+                  // Cheque/reference and mode in the same row.
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Payment Mode',
+                        paymentMode,
+                        fill: PdfColor.fromHex('#FFF2DD'),
+                      ),
+                      fieldCell(
+                        'Cheque / Payment Reference',
+                        chequeNumber,
+                        fill: PdfColor.fromHex('#F5EAF1'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              fieldCell(
+                'Amount in Words',
+                amountInWords(amount),
+                fill: PdfColor.fromHex('#F3F3EA'),
+              ),
+              if (isIssue) ...[
+                pw.SizedBox(height: 3),
+                plainWritingBox(
+                  'Verification Report',
+                  verification,
+                  lines: 4,
+                ),
+                pw.SizedBox(height: 3),
+                plainWritingBox(
+                  'Conditions',
+                  conditions ?? '',
+                  lines: 2,
+                ),
+                pw.SizedBox(height: 3),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(
+                      width: .55,
+                      color: PdfColors.grey700,
+                    ),
+                  ),
+                  child: pw.Table(
+                    border: pw.TableBorder.symmetric(
+                      inside: const pw.BorderSide(
+                        width: .45,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
+                    columnWidths: const {
+                      0: pw.FlexColumnWidth(),
+                      1: pw.FlexColumnWidth(),
+                      2: pw.FlexColumnWidth(),
+                    },
+                    children: [
+                      pw.TableRow(
+                        children: [
+                          verifierCell('Verified by 1', verifiedBy1),
+                          verifierCell('Verified by 2', verifiedBy2),
+                          verifierCell('Verified by 3', verifiedBy3),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              pw.SizedBox(height: 3),
+              plainWritingBox(
+                'Remarks',
+                remarks,
+                lines: 2,
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  signatureBox(
+                    'Borrower / Recipient Signature',
+                    recipientSignature,
+                  ),
+                  signatureBox(
+                    'Accountant Signature',
+                    accountantSignature,
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+              pw.Divider(height: 1),
+              pw.Text(
+                'Prepared by: ${(preparedBy ?? '').trim().isEmpty ? '—' : preparedBy!.trim()}',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return document;
+  }
+
+  static pw.Document zakaatVoucherDocument({
+    required String voucherNumber,
+    required DateTime date,
+    required String recipientName,
+    required String address,
+    required String aadhaar,
+    required String phone,
+    required double amount,
+    required String reason,
+    required String authority,
+    required String cheque,
+    required String paymentMode,
+    required String verification,
+    required String verifiedBy1,
+    required String verifiedBy2,
+    required String verifiedBy3,
+    required String remarks,
+    Uint8List? recipientSignature,
+    Uint8List? accountantSignature,
+    String? preparedBy,
+  }) {
+    final document = pw.Document();
+
+    pw.Widget fieldCell(
+      String label,
+      String value, {
+      bool boldValue = false,
+      PdfColor fill = PdfColors.white,
+      int maxLines = 1,
+    }) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        color: fill,
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 7.0,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 1.5),
+            pw.Text(
+              value.trim().isEmpty ? '—' : value.trim(),
+              maxLines: maxLines,
+              overflow: pw.TextOverflow.clip,
+              style: pw.TextStyle(
+                fontSize: 8.2,
+                fontWeight:
+                    boldValue ? pw.FontWeight.bold : pw.FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget plainWritingBox(
+      String label,
+      String value, {
+      required int lines,
+    }) {
+      final height = lines == 4 ? 43.0 : 27.0;
+      return pw.Container(
+        height: height,
+        padding: const pw.EdgeInsets.fromLTRB(5, 4, 5, 4),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(width: .6, color: PdfColors.grey700),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 8.0,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Expanded(
+              child: pw.Text(
+                value.trim(),
+                maxLines: lines,
+                overflow: pw.TextOverflow.clip,
+                style: const pw.TextStyle(fontSize: 8.0),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget verifierCell(String label, String name) {
+      return pw.Container(
+        height: 42,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: pw.Column(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          children: [
+            pw.Text(
+              label,
+              style: pw.TextStyle(
+                fontSize: 6.8,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              name.trim().isEmpty ? ' ' : name.trim(),
+              textAlign: pw.TextAlign.center,
+              maxLines: 1,
+              overflow: pw.TextOverflow.clip,
+              style: const pw.TextStyle(fontSize: 7.5),
+            ),
+            pw.SizedBox(height: 3),
+            pw.Container(
+              width: double.infinity,
+              height: 9,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(bottom: pw.BorderSide(width: .4)),
+              ),
+            ),
+            pw.SizedBox(height: 1),
+            pw.Text('Signature', style: const pw.TextStyle(fontSize: 6.2)),
+          ],
+        ),
+      );
+    }
+
+    pw.Widget signatureBox(String label, Uint8List? bytes) {
+      return pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          if (bytes != null && bytes.isNotEmpty)
+            pw.Container(
+              height: 30,
+              width: 145,
+              child: pw.Image(
+                pw.MemoryImage(bytes),
+                fit: pw.BoxFit.contain,
+              ),
+            )
+          else
+            pw.SizedBox(height: 30),
+          pw.Container(
+            width: 145,
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(width: .5)),
+            ),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            label,
+            textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 7.2),
+          ),
+        ],
+      );
+    }
+
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(18, 12, 18, 12),
+        build: (_) => pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(width: 1.0),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pdfBrandHeader(
+                documentTitle: 'ZAKAAT DISBURSEMENT VOUCHER',
+                large: false,
+              ),
+              pw.SizedBox(height: 2),
+
+              // Voucher number and date in the same row.
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Voucher / Form No.',
+                        voucherNumber,
+                        boldValue: true,
+                        fill: PdfColor.fromHex('#EAF4F0'),
+                      ),
+                      fieldCell(
+                        'Date',
+                        formatDate(date),
+                        fill: PdfColor.fromHex('#F6F0E3'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Recipient Name',
+                        recipientName,
+                        fill: PdfColor.fromHex('#EDF5F1'),
+                      ),
+                      fieldCell(
+                        'Issuing Authority / Report',
+                        authority,
+                        fill: PdfColor.fromHex('#F5EFE1'),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Address',
+                        address,
+                        fill: PdfColor.fromHex('#EEF2F7'),
+                        maxLines: 2,
+                      ),
+                      pw.Container(
+                        color: PdfColor.fromHex('#EEF2F7'),
+                        height: 34,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              // Aadhaar and phone in the same row.
+              pw.Table(
+                border: pw.TableBorder.all(width: .55),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(1),
+                },
+                children: [
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Aadhaar Card No.',
+                        aadhaar,
+                        fill: PdfColor.fromHex('#F8EEE7'),
+                      ),
+                      fieldCell(
+                        'Phone Number',
+                        phone,
+                        fill: PdfColor.fromHex('#F0EBF7'),
+                      ),
+                    ],
+                  ),
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Amount',
+                        'INR ${amount.toStringAsFixed(2)}',
+                        boldValue: true,
+                        fill: PdfColor.fromHex('#EAF6EA'),
+                      ),
+                      fieldCell(
+                        'Amount in Words',
+                        amountInWords(amount),
+                        fill: PdfColor.fromHex('#F3F3EA'),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                  // Cheque number and payment mode are in the same row.
+                  pw.TableRow(
+                    children: [
+                      fieldCell(
+                        'Cheque / Payment Reference',
+                        cheque,
+                        fill: PdfColor.fromHex('#F5EAF1'),
+                      ),
+                      fieldCell(
+                        'Payment Mode',
+                        paymentMode,
+                        fill: PdfColor.fromHex('#FFF2DD'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+
+              // "Reason" remains in the database and on the entry screen,
+              // but is deliberately omitted from the printed voucher.
+              plainWritingBox(
+                'Verification Report',
+                verification,
+                lines: 4,
+              ),
+              pw.SizedBox(height: 3),
+
+              pw.Container(
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(
+                    width: .55,
+                    color: PdfColors.grey700,
+                  ),
+                ),
+                child: pw.Table(
+                  border: pw.TableBorder.symmetric(
+                    inside: const pw.BorderSide(
+                      width: .45,
+                      color: PdfColors.grey600,
+                    ),
+                  ),
+                  columnWidths: const {
+                    0: pw.FlexColumnWidth(),
+                    1: pw.FlexColumnWidth(),
+                    2: pw.FlexColumnWidth(),
+                  },
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        verifierCell('Verified by 1', verifiedBy1),
+                        verifierCell('Verified by 2', verifiedBy2),
+                        verifierCell('Verified by 3', verifiedBy3),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 3),
+
+              plainWritingBox(
+                'Remarks',
+                remarks,
+                lines: 2,
+              ),
+              pw.SizedBox(height: 4),
+
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  signatureBox(
+                    'Recipient / Beneficiary Signature',
+                    recipientSignature,
+                  ),
+                  signatureBox(
+                    'Accountant Signature',
+                    accountantSignature,
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 3),
+              pw.Divider(height: 1),
+              pw.Text(
+                'Prepared by: ${(preparedBy ?? '').trim().isEmpty ? '—' : preparedBy!.trim()}',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return document;
+  }
+
+  static pw.Document qarzaWaiverVoucherDocument({
+    required String waiverNumber,
+    required DateTime date,
+    required String borrowerName,
+    required String originalQarzaNumber,
+    required double amount,
+    required String username,
+    required String remarks,
+  }) {
+    final document = pw.Document();
+    document.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(26),
+      build: (context) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pdfBrandHeader(documentTitle: 'QARZA WAIVER / ZAKAAT JOURNAL VOUCHER', large: true),
+          pw.Table(
+            border: pw.TableBorder.all(width: .7),
+            columnWidths: const {0: pw.FlexColumnWidth(1.35), 1: pw.FlexColumnWidth(2.65)},
+            children: [
+              pdfRow('Waiver No.', waiverNumber),
+              pdfRow('Date', formatDate(date)),
+              pdfRow('Borrower', borrowerName),
+              pdfRow('Original Qarz No.', originalQarzaNumber),
+              pdfRow('Amount', 'INR ${amount.toStringAsFixed(2)}'),
+              pdfRow('Amount in Words', amountInWords(amount)),
+              pdfRow('Prepared By', username),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text('Journal Entry', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 4),
+          pw.Table(
+            border: pw.TableBorder.all(width: .7),
+            columnWidths: const {0: pw.FlexColumnWidth(2), 1: pw.FlexColumnWidth(1)},
+            children: [
+              pdfRow('DEBIT — Zakaat Expense / Qarz Waiver', 'INR ${amount.toStringAsFixed(2)}'),
+              pdfRow('CREDIT — Qarza Receivable', 'INR ${amount.toStringAsFixed(2)}'),
+            ],
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text('Linked Donations Funding Reference', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Original Qarz funding is linked through $originalQarzaNumber. This link is a memorandum reference and is not counted as an additional cash credit.', style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 10),
+          pw.Text('Reason / Remarks', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all(width: .7)),
+            child: pw.Text(remarks, style: const pw.TextStyle(fontSize: 9)),
+          ),
+          pw.Spacer(),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              _signature('Prepared / Recorded By', null),
+              _signature('Authorized Signature', null),
+            ],
+          ),
+        ],
+      ),
+    ));
+    return document;
+  }
+
+  static pw.Document fundAdjustmentVoucherDocument({
+    required String title,
+    required String documentNumber,
+    required DateTime date,
+    required String fundLabel,
+    required String party,
+    String? address,
+    String? aadhaar,
+    String? phone,
+    required double amount,
+    String? chequeNumber,
+    required String paymentMode,
+    String? verification,
+    String? verifiedBy1,
+    String? verifiedBy2,
+    String? verifiedBy3,
+    String? remarks,
+    Uint8List? recipientSignature,
+    Uint8List? accountantSignature,
+    String? preparedBy,
+  }) {
+    final document = pw.Document();
+    document.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (_) => [
+          pw.Container(
+            padding: const pw.EdgeInsets.all(14),
+            decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.2, color: PdfColors.black)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pdfBrandHeader(documentTitle: title, large: true),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Document / Form No.: $documentNumber'),
+                    pw.Text('Date: ${formatDate(date)}'),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+                pw.Table(
+                  border: pw.TableBorder.all(width: .7),
+                  columnWidths: const {0: pw.FlexColumnWidth(1.35), 1: pw.FlexColumnWidth(2.65)},
+                  children: [
+                    pdfRow('Fund / Account', fundLabel),
+                    pdfRow('Party / Description', party),
+                    if ((address ?? '').trim().isNotEmpty) pdfRow('Address', address!.trim()),
+                    if ((aadhaar ?? '').trim().isNotEmpty) pdfRow('Aadhaar Card No.', aadhaar!.trim()),
+                    if ((phone ?? '').trim().isNotEmpty) pdfRow('Phone Number', phone!.trim()),
+                    pdfRow('Amount', 'INR ${amount.toStringAsFixed(2)}'),
+                    pdfRow('Amount in Words', amountInWords(amount)),
+                    pdfRow('Payment Mode', paymentMode),
+                    pdfRow('Cheque / Payment Reference', (chequeNumber ?? '').trim().isEmpty ? '—' : chequeNumber!.trim()),
+                  ],
+                ),
+                if ((verification ?? '').trim().isNotEmpty ||
+                    (verifiedBy1 ?? '').trim().isNotEmpty ||
+                    (verifiedBy2 ?? '').trim().isNotEmpty ||
+                    (verifiedBy3 ?? '').trim().isNotEmpty) ...[
+                  pw.SizedBox(height: 12),
+                  pw.Text('Verification', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  _linedArea(verification ?? '', lines: 8),
+                  pw.SizedBox(height: 10),
+                  pw.Table(
+                    border: pw.TableBorder.all(width: .7),
+                    columnWidths: const {0: pw.FlexColumnWidth(), 1: pw.FlexColumnWidth(), 2: pw.FlexColumnWidth()},
+                    children: [
+                      pw.TableRow(
+                        children: [
+                          ('Verified by 1', verifiedBy1 ?? ''),
+                          ('Verified by 2', verifiedBy2 ?? ''),
+                          ('Verified by 3', verifiedBy3 ?? ''),
+                        ].map((item) => pw.Container(
+                          padding: const pw.EdgeInsets.all(8),
+                          child: pw.Column(children: [
+                            pw.Text(item.$1, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                            pw.SizedBox(height: 20),
+                            pw.Text(item.$2.trim().isEmpty ? ' ' : item.$2.trim(), style: const pw.TextStyle(fontSize: 9)),
+                            pw.SizedBox(height: 18),
+                            pw.Text('Signature', style: const pw.TextStyle(fontSize: 8)),
+                          ]),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ],
+                pw.SizedBox(height: 12),
+                pw.Text('Remarks', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 4),
+                _linedArea(remarks ?? '', lines: 5),
+                pw.SizedBox(height: 14),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    _signature('Recipient / Party Signature', recipientSignature),
+                    _signature('Accountant Signature', accountantSignature),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Divider(),
+                pw.Text(
+                  'Prepared by: ${preparedBy?.trim().isEmpty ?? true ? '—' : preparedBy!.trim()}',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return document;
+  }
+
+}
