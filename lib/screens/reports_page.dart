@@ -62,10 +62,10 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   Future<void> _authorize() async {
-    final ok = await requireSuperuserPassword(
+    final ok = await requireAdminPassword(
       context,
       title: 'Authorize Reports',
-      message: 'Reports are available only to the superuser.',
+      message: 'Enter the Admin Password to access reports.',
     );
     if (!mounted) return;
     if (!ok) {
