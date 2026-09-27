@@ -207,6 +207,46 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _logout() async {
+    if (!mounted) return;
+    final user = (currentUsername ?? '').trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Logout'),
+        content: Text(
+          'Logout ${user.isEmpty ? 'the current user' : user}?\n\n'
+          'No accounting data or Firebase data will be deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('LOGOUT'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    currentUsername = null;
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginPage(
+          onSuccess: () {
+            navigatorKey.currentState?.pushReplacement(
+              MaterialPageRoute(builder: (_) => const DashboardPage()),
+            );
+          },
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   Future<void> _push(Widget page) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     if (mounted) _refresh();
@@ -278,23 +318,74 @@ class _DashboardPageState extends State<DashboardPage> {
     await _push(DataManagementPage(database: appDatabase));
   }
 
-  Future<void> _editActual(_FinancialSummary s) async {
-    final result = await showDialog<_ActualBalanceValues>(
+  Future<void> _editActualBalance(
+    String title,
+    double currentAmount,
+    double otherAmount,
+  ) async {
+    final controller = TextEditingController(
+      text: currentAmount.toStringAsFixed(2),
+    );
+    String? error;
+    final result = await showDialog<double>(
       context: context,
-      builder: (_) => _ActualBalancesDialog(
-        initialCash: s.cashInHand,
-        initialBank: s.bankBalance,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Amount',
+              prefixText: '₹ ',
+              errorText: error,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(0.0),
+              child: const Text('CLEAR'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final clean = controller.text
+                    .replaceAll(',', '')
+                    .replaceAll('₹', '')
+                    .trim();
+                final value = double.tryParse(clean);
+                if (value == null || value < 0) {
+                  setDialogState(
+                    () => error = 'Enter a valid non-negative amount.',
+                  );
+                  return;
+                }
+                Navigator.of(dialogContext).pop(value);
+              },
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
       ),
     );
+    controller.dispose();
     if (result == null || !mounted) return;
 
     try {
       final rows = await appDatabase.select(appDatabase.manualBalances).get();
+      final cash = title == 'Cash in Hand' ? result : otherAmount;
+      final bank = title == 'Bank Balance' ? result : otherAmount;
       if (rows.isEmpty) {
         await appDatabase.into(appDatabase.manualBalances).insert(
           ManualBalancesCompanion.insert(
-            cashInHand: Value(result.cash),
-            bankBalance: Value(result.bank),
+            cashInHand: Value(cash),
+            bankBalance: Value(bank),
           ),
         );
       } else {
@@ -302,8 +393,8 @@ class _DashboardPageState extends State<DashboardPage> {
               ..where((t) => t.id.equals(rows.first.id)))
             .write(
           ManualBalancesCompanion(
-            cashInHand: Value(result.cash),
-            bankBalance: Value(result.bank),
+            cashInHand: Value(cash),
+            bankBalance: Value(bank),
             updatedAt: Value(DateTime.now()),
           ),
         );
@@ -312,7 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save reconciliation values: $e')),
+          SnackBar(content: Text('Could not save $title: $e')),
         );
       }
     }
@@ -692,7 +783,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton.filledTonal(
-                        tooltip: 'Reports (Superuser)',
+                        tooltip: 'Reports (Admin)',
                         onPressed: () => _push(ReportsPage(database: appDatabase)),
                         icon: const Icon(Icons.bar_chart_rounded),
                       ),
@@ -717,16 +808,37 @@ class _DashboardPageState extends State<DashboardPage> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: .78),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline_rounded, color: kBrandGreen, size: 19),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text('Welcome, ${(currentUsername ?? '').trim().isEmpty ? 'User' : (currentUsername ?? '').trim()}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                        PopupMenuButton<String>(
+                          tooltip: 'User menu',
+                          icon: const Icon(Icons.person_outline_rounded, color: kBrandGreen, size: 21),
+                          onSelected: (value) {
+                            if (value == 'logout') _logout();
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'logout',
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(Icons.logout),
+                                title: Text('Logout'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            'Welcome, ${(currentUsername ?? '').trim().isEmpty ? 'User' : (currentUsername ?? '').trim()}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
                         TextButton.icon(
                           onPressed: _openDataManagement,
                           icon: const Icon(Icons.storage_outlined, size: 18),
@@ -806,8 +918,42 @@ class _DashboardPageState extends State<DashboardPage> {
         _section('Reconciliation'),
         _amountCard('Total Funds as per Ledgers', s.expectedTotal),
         const SizedBox(height: 10),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('Actual Cash & Bank', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)), TextButton.icon(onPressed: () => _editActual(s), icon: const Icon(Icons.edit), label: const Text('Enter / Edit'))]),
-        Row(children: [Expanded(child: _amountCard('Cash in Hand', s.cashInHand)), const SizedBox(width: 10), Expanded(child: _amountCard('Bank Balance', s.bankBalance))]),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Text(
+            'Actual Cash & Bank',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _amountCard(
+                'Cash in Hand',
+                s.cashInHand,
+                onTap: () => _editActualBalance(
+                  'Cash in Hand',
+                  s.cashInHand,
+                  s.bankBalance,
+                ),
+                tapHint: 'Edit amount',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _amountCard(
+                'Bank Balance',
+                s.bankBalance,
+                onTap: () => _editActualBalance(
+                  'Bank Balance',
+                  s.bankBalance,
+                  s.cashInHand,
+                ),
+                tapHint: 'Edit amount',
+              ),
+            ),
+          ],
+        ),
         _amountCard('Actual Total', actual),
         Card(
           child: Padding(
@@ -848,7 +994,17 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _fund(String title, double amount, VoidCallback onTap) => AppBalanceCard(title: title, amount: amount, onTap: onTap, prominent: title == 'Total Available Funds');
 
-  Widget _amountCard(String title, double amount) => AppBalanceCard(title: title, amount: amount);
+  Widget _amountCard(
+    String title,
+    double amount, {
+    VoidCallback? onTap,
+    String tapHint = 'View ledger',
+  }) => AppBalanceCard(
+        title: title,
+        amount: amount,
+        onTap: onTap,
+        tapHint: tapHint,
+      );
 }
 
 class _SwitchUserDialog extends StatefulWidget {
@@ -975,119 +1131,6 @@ class _SwitchUserDialogState extends State<_SwitchUserDialog> {
         FilledButton(
           onPressed: submitting ? null : _submit,
           child: Text(submitting ? 'Switching...' : 'Switch'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActualBalanceValues {
-  final double cash;
-  final double bank;
-
-  const _ActualBalanceValues({required this.cash, required this.bank});
-}
-
-class _ActualBalancesDialog extends StatefulWidget {
-  final double initialCash;
-  final double initialBank;
-
-  const _ActualBalancesDialog({
-    required this.initialCash,
-    required this.initialBank,
-  });
-
-  @override
-  State<_ActualBalancesDialog> createState() => _ActualBalancesDialogState();
-}
-
-class _ActualBalancesDialogState extends State<_ActualBalancesDialog> {
-  late final TextEditingController _cash;
-  late final TextEditingController _bank;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _cash = TextEditingController(text: widget.initialCash.toStringAsFixed(2));
-    _bank = TextEditingController(text: widget.initialBank.toStringAsFixed(2));
-  }
-
-  @override
-  void dispose() {
-    _cash.dispose();
-    _bank.dispose();
-    super.dispose();
-  }
-
-  double? _parse(String value) {
-    final clean = value.replaceAll(',', '').replaceAll('₹', '').trim();
-    if (clean.isEmpty) return null;
-    return double.tryParse(clean);
-  }
-
-  void _save() {
-    final cash = _parse(_cash.text);
-    final bank = _parse(_bank.text);
-    if (cash == null || bank == null || cash < 0 || bank < 0) {
-      setState(() => _error = 'Enter valid non-negative amounts.');
-      return;
-    }
-    Navigator.of(context).pop(_ActualBalanceValues(cash: cash, bank: bank));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Enter Actual Cash & Bank'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _cash,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Cash in Hand',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _bank,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _save(),
-              decoration: const InputDecoration(
-                labelText: 'Bank Balance',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Colors.red.shade700),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
         ),
       ],
     );
