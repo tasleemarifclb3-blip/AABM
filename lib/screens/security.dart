@@ -262,10 +262,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _manageUsers() async {
-    final ok = await requireAdminPassword(
+    final ok = await requireSuperuserPassword(
       context,
       title: 'Manage Users & Passwords',
-      message: 'Admin authorization is required to add, edit or remove users and manage the Superuser Password.',
+      message: 'Superuser authorization is required to add, edit or remove users and manage system passwords.',
     );
     if (!mounted || !ok) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UserManagementPage()));
@@ -432,14 +432,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
       builder: (_) => AlertDialog(
         title: const Text('Change Superuser Password'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: old, obscureText: true, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Admin Password', border: OutlineInputBorder())),
+          TextField(controller: old, obscureText: true, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Current Superuser Password', border: OutlineInputBorder())),
           const SizedBox(height: 12),
           TextField(controller: next, obscureText: true, maxLength: 4, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'New 4-digit password', border: OutlineInputBorder())),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           FilledButton(onPressed: () {
-            if (!verifyAdminPassword(old.text.trim()) || !RegExp(r'^\d{4}$').hasMatch(next.text.trim())) return;
+            if (!verifySuperuserPassword(old.text.trim()) || !RegExp(r'^\d{4}$').hasMatch(next.text.trim())) return;
             Navigator.pop(context, next.text.trim());
           }, child: const Text('Change')),
         ],
