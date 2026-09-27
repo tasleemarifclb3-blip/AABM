@@ -192,8 +192,16 @@ class AppBalanceCard extends StatelessWidget {
   final double amount;
   final VoidCallback? onTap;
   final bool prominent;
+  final String tapHint;
 
-  const AppBalanceCard({super.key, required this.title, required this.amount, this.onTap, this.prominent = false});
+  const AppBalanceCard({
+    super.key,
+    required this.title,
+    required this.amount,
+    this.onTap,
+    this.prominent = false,
+    this.tapHint = 'View ledger',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +227,7 @@ class AppBalanceCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text('₹${amount.toStringAsFixed(2)}', style: TextStyle(color: kBrandGreen, fontSize: prominent ? 20 : 17, fontWeight: FontWeight.w800)),
-              if (onTap != null) const Text('View ledger', style: TextStyle(color: Colors.black45, fontSize: 10)),
+              if (onTap != null) Text(tapHint, style: const TextStyle(color: Colors.black45, fontSize: 10)),
             ],
           ),
           if (onTap != null) const Padding(padding: EdgeInsets.only(left: 5), child: Icon(Icons.chevron_right_rounded, color: Colors.black38)),
