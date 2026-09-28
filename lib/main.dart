@@ -1,10 +1,10 @@
-import 'dart\:async';
+import 'dart:async';
 
-import 'package\:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' show Value;
 
-import 'package\:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import 'package\:flutter/services.dart';
+import 'package:flutter/services.dart';
 
 import 'database/sync_foundation.dart';
 
@@ -42,2160 +42,2158 @@ import 'screens/data_management_page.dart';
 
 import 'screens/app_ui.dart';
 
-**final** GlobalKey\<NavigatorState> navigatorKey = GlobalKey\<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-**final** AppDatabase appDatabase = AppDatabase();
+final AppDatabase appDatabase = AppDatabase();
 
-Future<**void**> main() async {
+Future<void> main() async {
 
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-  await initializeSecurity();
+  await initializeSecurity();
 
-  *// Render the application first. Database/Firebase synchronization is*
+  // Render the application first. Database/Firebase synchronization is*
 
-  *// deliberately started after the first frame so a slow web database,*
+  // deliberately started after the first frame so a slow web database,*
 
-  *// Firebase authentication, or a network problem cannot delay the login*
+  // Firebase authentication, or a network problem cannot delay the login*
 
-  *// screen or block the Android UI thread during startup.*
+  // screen or block the Android UI thread during startup.*
 
-  runApp(**const** BaitulMaalApp());
+  runApp(const BaitulMaalApp());
 
-  WidgetsBinding.instance.addPostFrameCallback((\_) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
 
-    unawaited(SyncFirestoreService.initialize(appDatabase));
+    unawaited(SyncFirestoreService.initialize(appDatabase));
 
-  });
+  });
 
 }
 
 class BaitulMaalApp extends StatelessWidget {
 
-  **const** BaitulMaalApp({super.key});
+  const BaitulMaalApp({super.key});
 
-  **@override**
+  @override
 
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
 
-    **final** scheme = ColorScheme.fromSeed(seedColor: kBrandGreen, brightness: Brightness.light);
+    final scheme = ColorScheme.fromSeed(seedColor: kBrandGreen, brightness: Brightness.light);
 
-    return MaterialApp(
+    return MaterialApp(
 
-      navigatorKey: navigatorKey,
+      navigatorKey: navigatorKey,
 
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false,
 
-      title: 'Al-Amin Baitul Maal',
+      title: 'Al-Amin Baitul Maal',
 
-      theme: ThemeData(
+      theme: ThemeData(
 
-        useMaterial3: true,
+        useMaterial3: true,
 
-        colorScheme: scheme,
+        colorScheme: scheme,
 
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: Colors.transparent,
 
-        cardTheme: CardThemeData(
+        cardTheme: CardThemeData(
 
-          elevation: 1.5,
+          elevation: 1.5,
 
-          margin: **const** EdgeInsets.symmetric(vertical: 6),
+          margin: const EdgeInsets.symmetric(vertical: 6),
 
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 
-        ),
+        ),
 
-        appBarTheme: **const** AppBarTheme(
+        appBarTheme: const AppBarTheme(
 
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.transparent,
 
-          foregroundColor: kBrandGreen,
+          foregroundColor: kBrandGreen,
 
-          centerTitle: false,
+          centerTitle: false,
 
-        ),
+        ),
 
-      ),
+      ),
 
-      builder: (context, child) => \_AlAminBackdrop(child: child),
+      builder: (context, child) => _AlAminBackdrop(child: child),
 
-      home: LoginPage(onSuccess: () { navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (\_) => **const** DashboardPage())); }),
+      home: LoginPage(onSuccess: () { navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (_) => const DashboardPage())); }),
 
-    );
+    );
 
-  }
+  }
 
 }
 
-class \_AlAminBackdrop extends StatelessWidget {
+class _AlAminBackdrop extends StatelessWidget {
 
-  **final** Widget? child;
+  final Widget? child;
 
-  **const** \_AlAminBackdrop({this.child});
+  const _AlAminBackdrop({this.child});
 
-  **@override**
+  @override
 
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
 
-    return Stack(
+    return Stack(
 
-      fit: StackFit.expand,
+      fit: StackFit.expand,
 
-      children: [
+      children: [
 
-        Positioned.fill(
+        Positioned.fill(
 
-          child: Image.asset(
+          child: Image.asset(
 
-            'assets/BAckground.jpg',
+            'assets/BAckground.jpg',
 
-            fit: BoxFit.cover,
+            fit: BoxFit.cover,
 
-            alignment: Alignment.center,
+            alignment: Alignment.center,
 
-            scale: 1.05,
+            scale: 1.05,
 
-          ),
+          ),
 
-        ),
+        ),
 
-        child ?? **const** SizedBox.shrink(),
+        child ?? const SizedBox.shrink(),
 
-      ],
+      ],
 
-    );
+    );
 
-  }
+  }
 
 }
 
 class DashboardPage extends StatefulWidget {
 
-  **const** DashboardPage({super.key});
+  const DashboardPage({super.key});
 
-  **@override**
+  @override
 
-  State\<DashboardPage> createState() => \_DashboardPageState();
+  State<DashboardPage> createState() => _DashboardPageState();
 
 }
 
-class \_DashboardPageState extends State\<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage> {
 
-  **final** PageController \_pages = PageController();
+  final PageController _pages = PageController();
 
-  **late** Future<\_FinancialSummary> \_future;
+  late Future<_FinancialSummary> _future;
 
-  int \_index = 0;
+  int _index = 0;
 
-  **@override**
+  @override
 
-  **void** initState() {
+  void initState() {
 
-    super.initState();
+    super.initState();
 
-    \_future = \_load();
+    _future = _load();
 
-  }
+  }
 
-  **@override**
+  @override
 
-  **void** dispose() {
+  void dispose() {
 
-    \_pages.dispose();
+    _pages.dispose();
 
-    super.dispose();
+    super.dispose();
 
-  }
+  }
 
-  Future<\_FinancialSummary> \_load() async {
+  Future<_FinancialSummary> _load() async {
 
-    **final** totals = await AccountingService.totals(appDatabase);
+    final totals = await AccountingService.totals(appDatabase);
 
-    **final** now = DateTime.now();
+    final now = DateTime.now();
 
-    bool sameDate(DateTime d) =>
+    bool sameDate(DateTime d) =>
 
-        d.year == now\.year && d.month == now\.month && d.day == now\.day;
+        d.year == now.year && d.month == now.month && d.day == now.day;
 
-    **var** todayCash = 0.0;
+    var todayCash = 0.0;
 
-    **var** todayBank = 0.0;
+    var todayBank = 0.0;
 
-    **final** members = await appDatabase.select(appDatabase.householdPayments).get();
+    final members = await appDatabase.select(appDatabase.householdPayments).get();
 
-    for (**final** p in members) {
+    for (final p in members) {
 
-      if (!sameDate(p.paymentDate)) continue;
+      if (!sameDate(p.paymentDate)) continue;
 
-      if (p.paymentMode == 'Cash') todayCash += p.amount;
+      if (p.paymentMode == 'Cash') todayCash += p.amount;
 
-      if (p.paymentMode == 'Bank Transfer') todayBank += p.amount;
+      if (p.paymentMode == 'Bank Transfer') todayBank += p.amount;
 
-    }
+    }
 
-    **final** transactions = await appDatabase.select(appDatabase.financialTransactions).get();
+    final transactions = await appDatabase.select(appDatabase.financialTransactions).get();
 
-    for (**final** t in transactions) {
+    for (final t in transactions) {
 
-      if (!sameDate(t.transactionDate)) continue;
+      if (!sameDate(t.transactionDate)) continue;
 
-      if (t.paymentMode == 'Cash') todayCash += t.amount;
+      if (t.paymentMode == 'Cash') todayCash += t.amount;
 
-      if (t.paymentMode == 'Bank Transfer') todayBank += t.amount;
+      if (t.paymentMode == 'Bank Transfer') todayBank += t.amount;
 
-    }
+    }
 
-    **final** adjustments = await appDatabase.select(appDatabase.fundAdjustments).get();
+    final adjustments = await appDatabase.select(appDatabase.fundAdjustments).get();
 
-    for (**final** a in adjustments) {
+    for (final a in adjustments) {
 
-      if (!sameDate(a.transactionDate)) continue;
+      if (!sameDate(a.transactionDate)) continue;
 
-      if (a.adjustmentType != 'QARZA_RECOVERY') continue;
+      if (a.adjustmentType != 'QARZA_RECOVERY') continue;
 
-      if (a.paymentMode == 'Cash') todayCash += a.amount;
+      if (a.paymentMode == 'Cash') todayCash += a.amount;
 
-      if (a.paymentMode == 'Bank Transfer') todayBank += a.amount;
+      if (a.paymentMode == 'Bank Transfer') todayBank += a.amount;
 
-    }
+    }
 
-    **final** manualRows = await appDatabase.select(appDatabase.manualBalances).get();
+    final manualRows = await appDatabase.select(appDatabase.manualBalances).get();
 
-    **final** cash = manualRows.isEmpty ? 0.0 : manualRows.first.cashInHand;
+    final cash = manualRows.isEmpty ? 0.0 : manualRows.first.cashInHand;
 
-    **final** bank = manualRows.isEmpty ? 0.0 : manualRows.first.bankBalance;
+    final bank = manualRows.isEmpty ? 0.0 : manualRows.first.bankBalance;
 
-    return \_FinancialSummary(
+    return _FinancialSummary(
 
-      monthlyDonation: totals.monthlyDonation,
+      monthlyDonation: totals.monthlyDonation,
 
-      generalDonation: totals.generalDonation,
+      generalDonation: totals.generalDonation,
 
-      boxCollection: totals.boxCollection,
+      boxCollection: totals.boxCollection,
 
-      otherIncome: totals.otherIncome,
+      otherIncome: totals.otherIncome,
 
-      zakaat: totals.zakaatFund,
+      zakaat: totals.zakaatFund,
 
-      sadqaFitr: totals.sadqaFund,
+      sadqaFitr: totals.sadqaFund,
 
-      qarzaNet: totals.qarzaNet,
+      qarzaNet: totals.qarzaNet,
 
-      todayCash: todayCash,
+      todayCash: todayCash,
 
-      todayBank: todayBank,
+      todayBank: todayBank,
 
-      cashInHand: cash,
+      cashInHand: cash,
 
-      bankBalance: bank,
+      bankBalance: bank,
 
-      donationFund: totals.donationFund,
+      donationFund: totals.donationFund,
 
-      expectedTotal: totals.netAvailable,
+      expectedTotal: totals.netAvailable,
 
-    );
+    );
 
-  }
+  }
 
-  **void** \_refresh() {
+  void _refresh() {
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    setState(() {
+    setState(() {
 
-      \_future = \_load();
+      _future = _load();
 
-    });
+    });
 
-  }
+  }
 
-  Future<**void**> \_syncAndRefresh() async {
+  Future<void> _syncAndRefresh() async {
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
 
-      **const** SnackBar(
+      const SnackBar(
 
-        content: Row(children: [
+        content: Row(children: [
 
-          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
 
-          SizedBox(width: 12),
+          SizedBox(width: 12),
 
-          Text('Synchronizing with Firebase...'),
+          Text('Synchronizing with Firebase...'),
 
-        ]),
+        ]),
 
-        duration: Duration(seconds: 30),
+        duration: Duration(seconds: 30),
 
-      ),
+      ),
 
-    );
+    );
 
-    **final** status = await SyncFirestoreService.syncNow();
+    final status = await SyncFirestoreService.syncNow();
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    if (status.ok && !status.busy) {
+    if (status.ok && !status.busy) {
 
-      \_refresh();
+      _refresh();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
 
-        **const** SnackBar(content: Text('Sync completed successfully. Ledgers and reports have been refreshed.')),
+        const SnackBar(content: Text('Sync completed successfully. Ledgers and reports have been refreshed.')),
 
-      );
+      );
 
-    } else {
+    } else {
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
 
-        SnackBar(content: Text('Sync could not be completed: ${status.message ?? 'Sync is already running.'}')),
+        SnackBar(content: Text('Sync could not be completed: ${status.message ?? 'Sync is already running.'}')),
 
-      );
+      );
 
-    }
+    }
 
-  }
+  }
 
-  Future<**void**> \_logout() async {
+  Future<void> _logout() async {
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    **final** user = (currentUsername ?? '').trim();
+    final user = (currentUsername ?? '').trim();
 
-    **final** confirmed = await showDialog\<bool>(
+    final confirmed = await showDialog<bool>(
 
-      context: context,
+      context: context,
 
-      barrierDismissible: false,
+      barrierDismissible: false,
 
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
 
-        title: **const** Text('Logout'),
+        title: const Text('Logout'),
 
-        content: Text(
+        content: Text(
 
-          'Logout ${user.isEmpty ? 'the current user' : user}?\n\n'
+          'Logout ${user.isEmpty ? 'the current user' : user}?\n\n'
 
-          'No accounting data or Firebase data will be deleted.',
+          'No accounting data or Firebase data will be deleted.',
 
-        ),
+        ),
 
-        actions: [
+        actions: [
 
-          TextButton(
+          TextButton(
 
-            onPressed: () => Navigator.of(dialogContext).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
 
-            child: **const** Text('CANCEL'),
+            child: const Text('CANCEL'),
 
-          ),
+          ),
 
-          FilledButton(
+          FilledButton(
 
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
 
-            child: **const** Text('LOGOUT'),
+            child: const Text('LOGOUT'),
 
-          ),
+          ),
 
-        ],
+        ],
 
-      ),
+      ),
 
-    );
+    );
 
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) return;
 
-    currentUsername = null;
+    currentUsername = null;
 
-    navigatorKey.currentState?.pushAndRemoveUntil(
+    navigatorKey.currentState?.pushAndRemoveUntil(
 
-      MaterialPageRoute(
+      MaterialPageRoute(
 
-        builder: (\_) => LoginPage(
+        builder: (_) => LoginPage(
 
-          onSuccess: () {
+          onSuccess: () {
 
-            navigatorKey.currentState?.pushReplacement(
+            navigatorKey.currentState?.pushReplacement(
 
-              MaterialPageRoute(builder: (\_) => **const** DashboardPage()),
+              MaterialPageRoute(builder: (_) => const DashboardPage()),
 
-            );
+            );
 
-          },
+          },
 
-        ),
+        ),
 
-      ),
+      ),
 
-      (route) => false,
+      (route) => false,
 
-    );
+    );
 
-  }
+  }
 
-  Future<**void**> \_push(Widget page) async {
+  Future<void> _push(Widget page) async {
 
-    await Navigator.push(context, MaterialPageRoute(builder: (\_) => page));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-    if (mounted) \_refresh();
+    if (mounted) _refresh();
 
-  }
+  }
 
-  Future<**void**> \_openDataManagement() async {
+  Future<void> _openDataManagement() async {
 
-    **final** controller = TextEditingController();
+    final controller = TextEditingController();
 
-    bool obscure = true;
+    bool obscure = true;
 
-    **final** password = await showDialog\<String>(
+    final password = await showDialog<String>(
 
-      context: context,
+      context: context,
 
-      barrierDismissible: false,
+      barrierDismissible: false,
 
-      useRootNavigator: true,
+      useRootNavigator: true,
 
-      requestFocus: false,
+      requestFocus: false,
 
-      builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
 
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
 
-          title: **const** Row(
+          title: const Row(
 
-            children: [
+            children: [
 
-              Icon(Icons.lock_outline_rounded, color: kBrandGreen),
+              Icon(Icons.lock_outline_rounded, color: kBrandGreen),
 
-              SizedBox(width: 10),
+              SizedBox(width: 10),
 
-              Text('Data Management'),
+              Text('Data Management'),
 
-            ],
+            ],
 
-          ),
+          ),
 
-          content: TextField(
+          content: TextField(
 
-            controller: controller,
+            controller: controller,
 
-            *// Do not request focus automatically. On Flutter web, an*
+            // Do not request focus automatically. On Flutter web, an*
 
-            *// // autofocus TextField inside a modal can leave the dialog*
+            // // autofocus TextField inside a modal can leave the dialog*
 
-            *// FocusScope attached for one frame after the route is popped.*
+            // FocusScope attached for one frame after the route is popped.*
 
-            obscureText: obscure,
+            obscureText: obscure,
 
-            decoration: InputDecoration(
+            decoration: InputDecoration(
 
-              labelText: 'Superuser Password',
+              labelText: 'Superuser Password',
 
-              border: **const** OutlineInputBorder(),
+              border: const OutlineInputBorder(),
 
-              suffixIcon: IconButton(
+              suffixIcon: IconButton(
 
-                tooltip: obscure ? 'Show password' : 'Hide password',
+                tooltip: obscure ? 'Show password' : 'Hide password',
 
-                onPressed: () => setDialogState(() => obscure = !obscure),
+                onPressed: () => setDialogState(() => obscure = !obscure),
 
-                icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
 
-              ),
+              ),
 
-            ),
+            ),
 
-            onSubmitted: (\_) {
+            onSubmitted: (_) {
 
-              FocusScope.of(dialogContext).unfocus();
+              FocusScope.of(dialogContext).unfocus();
 
-              Navigator.pop(dialogContext, controller.text);
+              Navigator.pop(dialogContext, controller.text);
 
-            },
+            },
 
-          ),
+          ),
 
-          actions: [
+          actions: [
 
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: **const** Text('CANCEL')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
 
-            FilledButton.icon(
+            FilledButton.icon(
 
-              onPressed: () {
+              onPressed: () {
 
-                FocusScope.of(dialogContext).unfocus();
+                FocusScope.of(dialogContext).unfocus();
 
-                Navigator.pop(dialogContext, controller.text);
+                Navigator.pop(dialogContext, controller.text);
 
-              },
+              },
 
-              icon: **const** Icon(Icons.lock_open_rounded),
+              icon: const Icon(Icons.lock_open_rounded),
 
-              label: **const** Text('CONTINUE'),
+              label: const Text('CONTINUE'),
 
-            ),
+            ),
 
-          ],
+          ],
 
-        ),
+        ),
 
-      ),
+      ),
 
-    );
+    );
 
-    *// Let the modal route, FocusScope and keyboard detach before disposing*
+    // Let the modal route, FocusScope and keyboard detach before disposing*
 
-    *// the controller or pushing the Data Management page. This prevents the*
+    // the controller or pushing the Data Management page. This prevents the*
 
-    *// Flutter web '\_dependents.isEmpty' assertion during dialog teardown.*
+    // Flutter web '_dependents.isEmpty' assertion during dialog teardown.*
 
-    await Future<**void**>.delayed(**const** Duration(milliseconds: 120));
+    await Future<void>.delayed(const Duration(milliseconds: 120));
 
-    controller.dispose();
+    controller.dispose();
 
-    if (!mounted || password == null) return;
+    if (!mounted || password == null) return;
 
-    if (!verifySuperuserPassword(password.trim())) {
+    if (!verifySuperuserPassword(password.trim())) {
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
 
-        **const** SnackBar(content: Text('Invalid Superuser password.')),
+        const SnackBar(content: Text('Invalid Superuser password.')),
 
-      );
+      );
 
-      return;
+      return;
 
-    }
+    }
 
-    await \_push(DataManagementPage(database: appDatabase));
+    await _push(DataManagementPage(database: appDatabase));
 
-  }
+  }
 
-  Future<**void**> \_editActualBalance(
+  Future<void> _editActualBalance(
 
-    String title,
+    String title,
 
-    double currentAmount,
+    double currentAmount,
 
-    double otherAmount,
+    double otherAmount,
 
-  ) async {
+  ) async {
 
-    **final** controller = TextEditingController(
+    final controller = TextEditingController(
 
-      text: currentAmount.toStringAsFixed(2),
+      text: currentAmount.toStringAsFixed(2),
 
-    );
+    );
 
-    String? error;
+    String? error;
 
-    **final** result = await showDialog\<double>(
+    final result = await showDialog<double>(
 
-      context: context,
+      context: context,
 
-      barrierDismissible: false,
+      barrierDismissible: false,
 
-      builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
 
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => AlertDialog(
 
-          title: Text(title),
+          title: Text(title),
 
-          content: TextField(
+          content: TextField(
 
-            controller: controller,
+            controller: controller,
 
-            autofocus: true,
+            autofocus: true,
 
-            keyboardType: **const** TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
 
-            decoration: InputDecoration(
+            decoration: InputDecoration(
 
-              labelText: 'Amount',
+              labelText: 'Amount',
 
-              prefixText: '₹ ',
+              prefixText: '₹ ',
 
-              errorText: error,
+              errorText: error,
 
-              border: **const** OutlineInputBorder(),
+              border: const OutlineInputBorder(),
 
-            ),
+            ),
 
-          ),
+          ),
 
-          actions: [
+          actions: [
 
-            TextButton(
+            TextButton(
 
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
 
-              child: **const** Text('CANCEL'),
+              child: const Text('CANCEL'),
 
-            ),
+            ),
 
-            TextButton(
+            TextButton(
 
-              onPressed: () => Navigator.of(dialogContext).pop(0.0),
+              onPressed: () => Navigator.of(dialogContext).pop(0.0),
 
-              child: **const** Text('CLEAR'),
+              child: const Text('CLEAR'),
 
-            ),
+            ),
 
-            FilledButton(
+            FilledButton(
 
-              onPressed: () {
+              onPressed: () {
 
-                **final** clean = controller.text
+                final clean = controller.text
 
-                    .replaceAll(',', '')
+                    .replaceAll(',', '')
 
-                    .replaceAll('₹', '')
+                    .replaceAll('₹', '')
 
-                    .trim();
+                    .trim();
 
-                **final** value = double.tryParse(clean);
+                final value = double.tryParse(clean);
 
-                if (value == null || value < 0) {
+                if (value == null || value < 0) {
 
-                  setDialogState(
+                  setDialogState(
 
-                    () => error = 'Enter a valid non-negative amount.',
+                    () => error = 'Enter a valid non-negative amount.',
 
-                  );
+                  );
 
-                  return;
+                  return;
 
-                }
+                }
 
-                Navigator.of(dialogContext).pop(value);
+                Navigator.of(dialogContext).pop(value);
 
-              },
+              },
 
-              child: **const** Text('SAVE'),
+              child: const Text('SAVE'),
 
-            ),
+            ),
 
-          ],
+          ],
 
-        ),
+        ),
 
-      ),
+      ),
 
-    );
+    );
 
-    controller.dispose();
+    controller.dispose();
 
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) return;
 
-    try {
+    try {
 
-      **final** rows = await appDatabase.select(appDatabase.manualBalances).get();
+      final rows = await appDatabase.select(appDatabase.manualBalances).get();
 
-      **final** cash = title == 'Cash in Hand' ? result : otherAmount;
+      final cash = title == 'Cash in Hand' ? result : otherAmount;
 
-      **final** bank = title == 'Bank Balance' ? result : otherAmount;
+      final bank = title == 'Bank Balance' ? result : otherAmount;
 
-      if (rows.isEmpty) {
+      if (rows.isEmpty) {
 
-        await appDatabase.into(appDatabase.manualBalances).insert(
+        await appDatabase.into(appDatabase.manualBalances).insert(
 
-          ManualBalancesCompanion.insert(
+          ManualBalancesCompanion.insert(
 
-            cashInHand: Value(cash),
+            cashInHand: Value(cash),
 
-            bankBalance: Value(bank),
+            bankBalance: Value(bank),
 
-          ),
+          ),
 
-        );
+        );
 
-      } else {
+      } else {
 
-        await (appDatabase.update(appDatabase.manualBalances)
+        await (appDatabase.update(appDatabase.manualBalances)
 
-              ..where((t) => t.id.equals(rows.first.id)))
+              ..where((t) => t.id.equals(rows.first.id)))
 
-            .write(
+            .write(
 
-          ManualBalancesCompanion(
+          ManualBalancesCompanion(
 
-            cashInHand: Value(cash),
+            cashInHand: Value(cash),
 
-            bankBalance: Value(bank),
+            bankBalance: Value(bank),
 
-            updatedAt: Value(DateTime.now()),
+            updatedAt: Value(DateTime.now()),
 
-          ),
+          ),
 
-        );
+        );
 
-      }
+      }
 
-      if (mounted) \_refresh();
+      if (mounted) _refresh();
 
-    } catch (e) {
+    } catch (e) {
 
-      if (mounted) {
+      if (mounted) {
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
 
-          SnackBar(content: Text('Could not save $title: $e')),
+          SnackBar(content: Text('Could not save $title: $e')),
 
-        );
+        );
 
-      }
+      }
 
-    }
+    }
 
-  }
+  }
 
-  Future<**void**> \_confirmExit() async {
+  Future<void> _confirmExit() async {
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    **final** shouldExit = await showDialog\<bool>(
+    final shouldExit = await showDialog<bool>(
 
-      context: context,
+      context: context,
 
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
 
-        title: **const** Text('Exit Al-Amin Baitul Maal?'),
+        title: const Text('Exit Al-Amin Baitul Maal?'),
 
-        content: **const** Text('Are you sure you want to leave the application?'),
+        content: const Text('Are you sure you want to leave the application?'),
 
-        actions: [
+        actions: [
 
-          TextButton(
+          TextButton(
 
-            onPressed: () => Navigator.of(dialogContext).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
 
-            child: **const** Text('Cancel'),
+            child: const Text('Cancel'),
 
-          ),
+          ),
 
-          FilledButton(
+          FilledButton(
 
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
 
-            child: **const** Text('Exit'),
+            child: const Text('Exit'),
 
-          ),
+          ),
 
-        ],
+        ],
 
-      ),
+      ),
 
-    );
+    );
 
-    if (shouldExit != true || !mounted) return;
+    if (shouldExit != true || !mounted) return;
 
-    await appDatabase.close();
+    await appDatabase.close();
 
-    await SystemNavigator.pop();
+    await SystemNavigator.pop();
 
-  }
+  }
 
-  **@override**
+  @override
 
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
 
-    SystemChrome.setSystemUIOverlayStyle(**const** SystemUiOverlayStyle(
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
 
-      statusBarColor: Colors.transparent,
+      statusBarColor: Colors.transparent,
 
-      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
 
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.dark,
 
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.dark,
 
-    ));
+    ));
 
-    return PopScope(
+    return PopScope(
 
-      canPop: false,
+      canPop: false,
 
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvokedWithResult: (didPop, result) {
 
-        if (!didPop) {
+        if (!didPop) {
 
-          \_confirmExit();
+          _confirmExit();
 
-        }
+        }
 
-      },
+      },
 
-      child: Scaffold(
+      child: Scaffold(
 
-        *// Keep the full logo at the top of the dashboard. Action buttons*
+        // Keep the full logo at the top of the dashboard. Action buttons*
 
-        *// deliberately sit below it rather than sharing the logo row.*
+        // deliberately sit below it rather than sharing the logo row.*
 
-        appBar: **const** PreferredSize(
+        appBar: const PreferredSize(
 
-          preferredSize: Size.zero,
+          preferredSize: Size.zero,
 
-          child: SizedBox.shrink(),
+          child: SizedBox.shrink(),
 
-        ),
+        ),
 
-        body: FutureBuilder<\_FinancialSummary>(
+        body: FutureBuilder<_FinancialSummary>(
 
-          future: \_future,
+          future: _future,
 
-          builder: (context, snap) {
+          builder: (context, snap) {
 
-            if (snap.connectionState != ConnectionState.done) {
+            if (snap.connectionState != ConnectionState.done) {
 
-              return **const** Center(child: CircularProgressIndicator());
+              return const Center(child: CircularProgressIndicator());
 
-            }
+            }
 
-            if (snap.hasError) {
+            if (snap.hasError) {
 
-              return Center(
+              return Center(
 
-                child: Padding(
+                child: Padding(
 
-                  padding: **const** EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
 
-                  child: Text(
+                  child: Text(
 
-                    'Could not load Dashboard:\\\n${snap.error}',
+                    'Could not load Dashboard:\n${snap.error}',
 
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.center,
 
-                  ),
+                  ),
 
-                ),
+                ),
 
-              );
+              );
 
-            }
+            }
 
-            **final** s = snap.data!;
+            final s = snap.data!;
 
-            return Column(
+            return Column(
 
-              children: [
+              children: [
 
-                Expanded(
+                Expanded(
 
-                  child: PageView(
+                  child: PageView(
 
-                    controller: \_pages,
+                    controller: _pages,
 
-                    onPageChanged: (v) => setState(() => \_index = v),
+                    onPageChanged: (v) => setState(() => _index = v),
 
-                    children: [
+                    children: [
 
-                      \_screenOne(s),
+                      _screenOne(s),
 
-                      \_screenTwo(s),
+                      _screenTwo(s),
 
-                      \_screenThree(s),
+                      _screenThree(s),
 
-                    ],
+                    ],
 
-                  ),
+                  ),
 
-                ),
+                ),
 
-                Padding(
+                Padding(
 
-                  padding: **const** EdgeInsets.only(bottom: 7),
+                  padding: const EdgeInsets.only(bottom: 7),
 
-                  child: Row(
+                  child: Row(
 
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
 
-                    children: List.generate(
+                    children: List.generate(
 
-                      3,
+                      3,
 
-                      (i) => Container(
+                      (i) => Container(
 
-                        width: 9,
+                        width: 9,
 
-                        height: 9,
+                        height: 9,
 
-                        margin: **const** EdgeInsets.symmetric(horizontal: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
 
-                        decoration: BoxDecoration(
+                        decoration: BoxDecoration(
 
-                          shape: BoxShape.circle,
+                          shape: BoxShape.circle,
 
-                          color: i == \_index
+                          color: i == _index
 
-                              ? kBrandGreen
+                              ? kBrandGreen
 
-                              : Colors.grey.shade400,
+                              : Colors.grey.shade400,
 
-                        ),
+                        ),
 
-                      ),
+                      ),
 
-                    ),
+                    ),
 
-                  ),
+                  ),
 
-                ),
+                ),
 
-              ],
+              ],
 
-            );
+            );
 
-          },
+          },
 
-        ),
+        ),
 
-      ),
+      ),
 
-    );
+    );
 
-  }
+  }
 
-  Widget \_approvalBanner() {
+  Widget _approvalBanner() {
 
-    return FutureBuilder\<String>(
+    return FutureBuilder<String>(
 
-      future: WorkflowService.activeApprover(appDatabase),
+      future: WorkflowService.activeApprover(appDatabase),
 
-      builder: (context, approverSnap) {
+      builder: (context, approverSnap) {
 
-        **final** approver = (approverSnap.data ?? '').trim();
+        final approver = (approverSnap.data ?? '').trim();
 
-        **final** user = (currentUsername ?? '').trim();
+        final user = (currentUsername ?? '').trim();
 
-        if (approver.isEmpty || user.toLowerCase() != approver.toLowerCase()) {
+        if (approver.isEmpty || user.toLowerCase() != approver.toLowerCase()) {
 
-          return **const** SizedBox.shrink();
+          return const SizedBox.shrink();
 
-        }
+        }
 
-        return FutureBuilder\<List\<PendingCheque>>(
+        return FutureBuilder<List<PendingCheque>>(
 
-          future: WorkflowService.pending(appDatabase),
+          future: WorkflowService.pending(appDatabase),
 
-          builder: (context, snap) {
+          builder: (context, snap) {
 
-            **final** pending = snap.data ?? **const** \<PendingCheque>[];
+            final pending = snap.data ?? const <PendingCheque>[];
 
-            if (pending.isEmpty) return **const** SizedBox.shrink();
+            if (pending.isEmpty) return const SizedBox.shrink();
 
-            return Card(
+            return Card(
 
-              child: ListTile(
+              child: ListTile(
 
-                leading: **const** Icon(Icons.pending_actions),
+                leading: const Icon(Icons.pending_actions),
 
-                title: Text(
+                title: Text(
 
-                  '${pending.length} transaction${pending.length == 1 ? '' : 's'} awaiting approval',
+                  '${pending.length} transaction${pending.length == 1 ? '' : 's'} awaiting approval',
 
-                  style: **const** TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
 
-                ),
+                ),
 
-                subtitle: Text('$approver is the configured approver.'),
+                subtitle: Text('$approver is the configured approver.'),
 
-                trailing: FilledButton.tonal(
+                trailing: FilledButton.tonal(
 
-                  onPressed: \_showPendingApprovals,
+                  onPressed: _showPendingApprovals,
 
-                  child: **const** Text('Review'),
+                  child: const Text('Review'),
 
-                ),
+                ),
 
-              ),
+              ),
 
-            );
+            );
 
-          },
+          },
 
-        );
+        );
 
-      },
+      },
 
-    );
+    );
 
-  }
+  }
 
-  Future<**void**> \_changeApprover() async {
+  Future<void> _changeApprover() async {
 
-    if (!await requireSuperuserPassword(
+    if (!await requireSuperuserPassword(
 
-      context,
+      context,
 
-      title: 'Change Approval Authority',
+      title: 'Change Approval Authority',
 
-      message: 'Enter the superuser password to change the single active approver.',
+      message: 'Enter the superuser password to change the single active approver.',
 
-    )) return;
+    )) return;
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    **final** users = kUserPasswords.keys.toList()
+    final users = kUserPasswords.keys.toList()
 
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-    **final** current = await WorkflowService.activeApprover(appDatabase);
+    final current = await WorkflowService.activeApprover(appDatabase);
 
-    **var** selected = users.contains(current) ? current : (users.isEmpty ? '' : users.first);
+    var selected = users.contains(current) ? current : (users.isEmpty ? '' : users.first);
 
-    **final** chosen = await showDialog\<String>(
+    final chosen = await showDialog<String>(
 
-      context: context,
+      context: context,
 
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => StatefulBuilder(
 
-        builder: (ctx, setLocal) => AlertDialog(
+        builder: (ctx, setLocal) => AlertDialog(
 
-          title: **const** Text('Single Active Approver'),
+          title: const Text('Single Active Approver'),
 
-          content: DropdownButtonFormField\<String>(
+          content: DropdownButtonFormField<String>(
 
-            initialValue: selected.isEmpty ? null : selected,
+            initialValue: selected.isEmpty ? null : selected,
 
-            decoration: **const** InputDecoration(
+            decoration: const InputDecoration(
 
-              labelText: 'Approver',
+              labelText: 'Approver',
 
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(),
 
-            ),
+            ),
 
-            items: users.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+            items: users.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
 
-            onChanged: (v) => setLocal(() => selected = v ?? selected),
+            onChanged: (v) => setLocal(() => selected = v ?? selected),
 
-          ),
+          ),
 
-          actions: [
+          actions: [
 
-            TextButton(onPressed: () => Navigator.pop(ctx), child: **const** Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
 
-            FilledButton(
+            FilledButton(
 
-              onPressed: selected.isEmpty ? null : () => Navigator.pop(ctx, selected),
+              onPressed: selected.isEmpty ? null : () => Navigator.pop(ctx, selected),
 
-              child: **const** Text('Save'),
+              child: const Text('Save'),
 
-            ),
+            ),
 
-          ],
+          ],
 
-        ),
+        ),
 
-      ),
+      ),
 
-    );
+    );
 
-    if (chosen == null || !mounted) return;
+    if (chosen == null || !mounted) return;
 
-    await WorkflowService.setActiveApprover(appDatabase, chosen);
+    await WorkflowService.setActiveApprover(appDatabase, chosen);
 
-    await SyncFirestoreService.syncNow();
+    await SyncFirestoreService.syncNow();
 
-    if (mounted) {
+    if (mounted) {
 
-      \_refresh();
+      _refresh();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
 
-        SnackBar(content: Text('Active approver changed to $chosen.')),
+        SnackBar(content: Text('Active approver changed to $chosen.')),
 
-      );
+      );
 
-    }
+    }
 
-  }
+  }
 
-  Future<**void**> \_showPendingApprovals() async {
+  Future<void> _showPendingApprovals() async {
 
-    **final** activeApprover = await WorkflowService.activeApprover(appDatabase);
+    final activeApprover = await WorkflowService.activeApprover(appDatabase);
 
-    **final** user = (currentUsername ?? '').trim();
+    final user = (currentUsername ?? '').trim();
 
-    **final** canApprove = user.toLowerCase() == activeApprover.toLowerCase();
+    final canApprove = user.toLowerCase() == activeApprover.toLowerCase();
 
-    **var** pending = await WorkflowService.pending(appDatabase);
+    var pending = await WorkflowService.pending(appDatabase);
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    Future\<String?> askReason() async {
+    Future<String?> askReason() async {
 
-      **final** controller = TextEditingController();
+      final controller = TextEditingController();
 
-      **final** reason = await showDialog\<String>(
+      final reason = await showDialog<String>(
 
-        context: context,
+        context: context,
 
-        barrierDismissible: false,
+        barrierDismissible: false,
 
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => AlertDialog(
 
-          title: **const** Text('Disprove Transaction'),
+          title: const Text('Disprove Transaction'),
 
-          content: TextField(
+          content: TextField(
 
-            controller: controller,
+            controller: controller,
 
-            autofocus: true,
+            autofocus: true,
 
-            maxLines: 4,
+            maxLines: 4,
 
-            decoration: **const** InputDecoration(
+            decoration: const InputDecoration(
 
-              labelText: 'Reason \*',
+              labelText: 'Reason \*',
 
-              hintText: 'Enter why this transaction is being disproved',
+              hintText: 'Enter why this transaction is being disproved',
 
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(),
 
-            ),
+            ),
 
-          ),
+          ),
 
-          actions: [
+          actions: [
 
-            TextButton(onPressed: () => Navigator.pop(ctx), child: **const** Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
 
-            FilledButton(
+            FilledButton(
 
-              onPressed: () {
+              onPressed: () {
 
-                if (controller.text.trim().isNotEmpty) Navigator.pop(ctx, controller.text.trim());
+                if (controller.text.trim().isNotEmpty) Navigator.pop(ctx, controller.text.trim());
 
-              },
+              },
 
-              child: **const** Text('Disprove'),
+              child: const Text('Disprove'),
 
-            ),
+            ),
 
-          ],
+          ],
 
-        ),
+        ),
 
-      );
+      );
 
-      controller.dispose();
+      controller.dispose();
 
-      return reason;
+      return reason;
 
-    }
+    }
 
-    await showDialog<**void**>(
+    await showDialog<void>(
 
-      context: context,
+      context: context,
 
-      builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
 
-        builder: (dialogContext, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) => AlertDialog(
 
-          title: Text('Unapproved Transactions — $activeApprover'),
+          title: Text('Unapproved Transactions — $activeApprover'),
 
-          content: SizedBox(
+          content: SizedBox(
 
-            width: 700,
+            width: 700,
 
-            child: pending.isEmpty
+            child: pending.isEmpty
 
-                ? **const** Text('No unapproved transactions.')
+                ? const Text('No unapproved transactions.')
 
-                : ListView\.builder(
+                : ListView.builder(
 
-                    shrinkWrap: true,
+                    shrinkWrap: true,
 
-                    itemCount: pending.length,
+                    itemCount: pending.length,
 
-                    itemBuilder: (context, index) {
+                    itemBuilder: (context, index) {
 
-                      **final** item = pending[index];
+                      final item = pending[index];
 
-                      return Card(
+                      return Card(
 
-                        child: Padding(
+                        child: Padding(
 
-                          padding: **const** EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(12),
 
-                          child: Column(
+                          child: Column(
 
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
-                            children: [
+                            children: [
 
-                              Text(item.description, style: **const** TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
 
-                              **const** SizedBox(height: 5),
+                              const SizedBox(height: 5),
 
-                              Text(
+                              Text(
 
-                                'Reference: ${item.reference.isEmpty ? '—' : item.reference}\n'
+                                'Reference: ${item.reference.isEmpty ? '—' : item.reference}\n'
 
-                                'Amount: ₹${item.amount.toStringAsFixed(2)}\n'
+                                'Amount: ₹${item.amount.toStringAsFixed(2)}\n'
 
-                                'Prepared by: ${item.requestedBy}\n'
+                                'Prepared by: ${item.requestedBy}\n'
 
-                                'Date: ${item.requestedAt == null ? '—' : ReceiptActions.formatDate(item.requestedAt!)}',
+                                'Date: ${item.requestedAt == null ? '—' : ReceiptActions.formatDate(item.requestedAt!)}',
 
-                              ),
+                              ),
 
-                              **const** SizedBox(height: 6),
+                              const SizedBox(height: 6),
 
-                              Text('Awaiting approval from $activeApprover.'),
+                              Text('Awaiting approval from $activeApprover.'),
 
-                              **const** SizedBox(height: 8),
+                              const SizedBox(height: 8),
 
-                              Row(
+                              Row(
 
-                                mainAxisAlignment: MainAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.end,
 
-                                children: [
+                                children: [
 
-                                  OutlinedButton.icon(
+                                  OutlinedButton.icon(
 
-                                    onPressed: !canApprove ? null : () async {
+                                    onPressed: !canApprove ? null : () async {
 
-                                      **final** reason = await askReason();
+                                      final reason = await askReason();
 
-                                      if (reason == null) return;
+                                      if (reason == null) return;
 
-                                      await WorkflowService.reject(
+                                      await WorkflowService.reject(
 
-                                        appDatabase,
+                                        appDatabase,
 
-                                        sourceTable: item.sourceTable,
+                                        sourceTable: item.sourceTable,
 
-                                        transactionId: item.transactionId,
+                                        transactionId: item.transactionId,
 
-                                        rejectedBy: user,
+                                        rejectedBy: user,
 
-                                        reason: reason,
+                                        reason: reason,
 
-                                      );
+                                      );
 
-                                      pending = await WorkflowService.pending(appDatabase);
+                                      pending = await WorkflowService.pending(appDatabase);
 
-                                      if (dialogContext.mounted) setDialogState(() {});
+                                      if (dialogContext.mounted) setDialogState(() {});
 
-                                      if (mounted) \_refresh();
+                                      if (mounted) _refresh();
 
-                                    },
+                                    },
 
-                                    icon: **const** Icon(Icons.block),
+                                    icon: const Icon(Icons.block),
 
-                                    label: **const** Text('Disprove'),
+                                    label: const Text('Disprove'),
 
-                                  ),
+                                  ),
 
-                                  **const** SizedBox(width: 8),
+                                  const SizedBox(width: 8),
 
-                                  FilledButton.icon(
+                                  FilledButton.icon(
 
-                                    onPressed: !canApprove ? null : () async {
+                                    onPressed: !canApprove ? null : () async {
 
-                                      await WorkflowService.approve(
+                                      await WorkflowService.approve(
 
-                                        appDatabase,
+                                        appDatabase,
 
-                                        sourceTable: item.sourceTable,
+                                        sourceTable: item.sourceTable,
 
-                                        transactionId: item.transactionId,
+                                        transactionId: item.transactionId,
 
-                                        approver: user,
+                                        approver: user,
 
-                                      );
+                                      );
 
-                                      pending = await WorkflowService.pending(appDatabase);
+                                      pending = await WorkflowService.pending(appDatabase);
 
-                                      if (dialogContext.mounted) setDialogState(() {});
+                                      if (dialogContext.mounted) setDialogState(() {});
 
-                                      if (mounted) \_refresh();
+                                      if (mounted) _refresh();
 
-                                    },
+                                    },
 
-                                    icon: **const** Icon(Icons.check),
+                                    icon: const Icon(Icons.check),
 
-                                    label: **const** Text('Approve'),
+                                    label: const Text('Approve'),
 
-                                  ),
+                                  ),
 
-                                ],
+                                ],
 
-                              ),
+                              ),
 
-                            ],
+                            ],
 
-                          ),
+                          ),
 
-                        ),
+                        ),
 
-                      );
+                      );
 
-                    },
+                    },
 
-                  ),
+                  ),
 
-          ),
+          ),
 
-          actions: [
+          actions: [
 
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: **const** Text('Close')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
 
-          ],
+          ],
 
-        ),
+        ),
 
-      ),
+      ),
 
-    );
+    );
 
-    if (mounted) \_refresh();
+    if (mounted) _refresh();
 
-  }
+  }
 
-  Future<**void**> \_switchUser() async {
+  Future<void> _switchUser() async {
 
-    **final** users = kUserPasswords.keys.toList()
+    final users = kUserPasswords.keys.toList()
 
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-    **final** initial = users.contains((currentUsername ?? '').trim())
+    final initial = users.contains((currentUsername ?? '').trim())
 
-        ? (currentUsername ?? '').trim()
+        ? (currentUsername ?? '').trim()
 
-        : (users.isEmpty ? '' : users.first);
+        : (users.isEmpty ? '' : users.first);
 
-    **final** authenticatedUser = await showDialog\<String>(
+    final authenticatedUser = await showDialog<String>(
 
-      context: context,
+      context: context,
 
-      barrierDismissible: false,
+      barrierDismissible: false,
 
-      useRootNavigator: true,
+      useRootNavigator: true,
 
-      builder: (\_) => \_SwitchUserDialog(users: users, initialUser: initial),
+      builder: (_) => _SwitchUserDialog(users: users, initialUser: initial),
 
-    );
+    );
 
-    if (authenticatedUser == null || !mounted) return;
+    if (authenticatedUser == null || !mounted) return;
 
-    *// Rebuild only after the dialog route, focus node and keyboard have fully*
+    // Rebuild only after the dialog route, focus node and keyboard have fully*
 
-    *// detached. This avoids the recurring Flutter \_dependents.isEmpty assertion.*
+    // detached. This avoids the recurring Flutter _dependents.isEmpty assertion.*
 
-    await Future<**void**>.delayed(**const** Duration(milliseconds: 120));
+    await Future<void>.delayed(const Duration(milliseconds: 120));
 
-    if (!mounted) return;
+    if (!mounted) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((\_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
 
-      if (!mounted) return;
+      if (!mounted) return;
 
-      setState(() {
+      setState(() {
 
-        currentUsername = authenticatedUser;
+        currentUsername = authenticatedUser;
 
-      });
+      });
 
-    });
+    });
 
-  }
+  }
 
-  Widget \_dashboardScrollable(\_FinancialSummary s, Widget content) {
+  Widget _dashboardScrollable(_FinancialSummary s, Widget content) {
 
-    return LayoutBuilder(
+    return LayoutBuilder(
 
-      builder: (context, constraints) {
+      builder: (context, constraints) {
 
-        *// Keep the dashboard comfortably sized on large laptop/desktop*
+        // Keep the dashboard comfortably sized on large laptop/desktop*
 
-        *// screens while allowing it to use the available width on phones.*
+        // screens while allowing it to use the available width on phones.*
 
-        **final** isDesktop = constraints.maxWidth >= 800;
+        final isDesktop = constraints.maxWidth >= 800;
 
-        **final** maxContentWidth = isDesktop ? 1100.0 : double.infinity;
+        final maxContentWidth = isDesktop ? 1100.0 : double.infinity;
 
-        return SingleChildScrollView(
+        return SingleChildScrollView(
 
-          padding: EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
 
-            isDesktop ? 24 : 16,
+            isDesktop ? 24 : 16,
 
-            8,
+            8,
 
-            isDesktop ? 24 : 16,
+            isDesktop ? 24 : 16,
 
-            16,
+            16,
 
-          ),
+          ),
 
-          child: Center(
+          child: Center(
 
-            child: ConstrainedBox(
+            child: ConstrainedBox(
 
-              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
 
-              child: Column(
+              child: Column(
 
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
 
-                children: [
+                children: [
 
-                  **const** AppPageHeader(
+                  const AppPageHeader(
 
-                    title: 'Al-Amin Baitul Maal',
+                    title: 'Al-Amin Baitul Maal',
 
-                    subtitle: 'Manage receipts, funds, expenses and approvals',
+                    subtitle: 'Manage receipts, funds, expenses and approvals',
 
-                    icon: Icons.account_balance_rounded,
+                  ),
 
-                  ),
+                  Row(
 
-                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
 
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
 
-                    children: [
+                      IconButton.filledTonal(
 
-                      IconButton.filledTonal(
+                        tooltip: 'Reports (Admin)',
 
-                        tooltip: 'Reports (Admin)',
+                        onPressed: () => _push(ReportsPage(database: appDatabase)),
 
-                        onPressed: () => \_push(ReportsPage(database: appDatabase)),
+                        icon: const Icon(Icons.bar_chart_rounded),
 
-                        icon: **const** Icon(Icons.bar_chart_rounded),
+                      ),
 
-                      ),
+                      const SizedBox(width: 8),
 
-                      **const** SizedBox(width: 8),
+                      IconButton.filledTonal(
 
-                      IconButton.filledTonal(
+                        tooltip: 'Change Approver (Superuser)',
 
-                        tooltip: 'Change Approver (Superuser)',
+                        onPressed: _changeApprover,
 
-                        onPressed: \_changeApprover,
+                        icon: const Icon(Icons.verified_user_outlined),
 
-                        icon: **const** Icon(Icons.verified_user_outlined),
+                      ),
 
-                      ),
+                      const SizedBox(width: 8),
 
-                      **const** SizedBox(width: 8),
+                      IconButton.filledTonal(
 
-                      IconButton.filledTonal(
+                        tooltip: 'Switch User',
 
-                        tooltip: 'Switch User',
+                        onPressed: _switchUser,
 
-                        onPressed: \_switchUser,
+                        icon: const Icon(Icons.switch_account_outlined),
 
-                        icon: **const** Icon(Icons.switch_account_outlined),
+                      ),
 
-                      ),
+                      const SizedBox(width: 8),
 
-                      **const** SizedBox(width: 8),
+                      IconButton.filledTonal(
 
-                      IconButton.filledTonal(
+                        tooltip: 'Sync & Refresh',
 
-                        tooltip: 'Sync & Refresh',
+                        onPressed: _syncAndRefresh,
 
-                        onPressed: \_syncAndRefresh,
+                        icon: const Icon(Icons.refresh_rounded),
 
-                        icon: **const** Icon(Icons.refresh_rounded),
+                      ),
 
-                      ),
+                    ],
 
-                    ],
+                  ),
 
-                  ),
+                  Container(
 
-                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
 
-                    padding: **const** EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
 
-                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .78),
 
-                      color: Colors.white.withValues(alpha: .78),
+                      borderRadius: BorderRadius.circular(14),
 
-                      borderRadius: BorderRadius.circular(14),
+                    ),
 
-                    ),
+                    child: Row(
 
-                    child: Row(
+                      children: [
 
-                      children: [
+                        PopupMenuButton<String>(
 
-                        PopupMenuButton\<String>(
+                          tooltip: 'User menu',
 
-                          tooltip: 'User menu',
+                          icon: const Icon(Icons.person_outline_rounded, color: kBrandGreen, size: 21),
 
-                          icon: **const** Icon(Icons.person_outline_rounded, color: kBrandGreen, size: 21),
+                          onSelected: (value) {
 
-                          onSelected: (value) {
+                            if (value == 'logout') _logout();
 
-                            if (value == 'logout') \_logout();
+                          },
 
-                          },
+                          itemBuilder: (context) => const [
 
-                          itemBuilder: (context) => **const** [
+                            PopupMenuItem<String>(
 
-                            PopupMenuItem\<String>(
+                              value: 'logout',
 
-                              value: 'logout',
+                              child: ListTile(
 
-                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
 
-                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(Icons.logout),
 
-                                leading: Icon(Icons.logout),
+                                title: Text('Logout'),
 
-                                title: Text('Logout'),
+                              ),
 
-                              ),
+                            ),
 
-                            ),
+                          ],
 
-                          ],
+                        ),
 
-                        ),
+                        const SizedBox(width: 2),
 
-                        **const** SizedBox(width: 2),
+                        Expanded(
 
-                        Expanded(
+                          child: Text(
 
-                          child: Text(
+                            'Welcome, ${(currentUsername ?? '').trim().isEmpty ? 'User' : (currentUsername ?? '').trim()}',
 
-                            'Welcome, ${(currentUsername ?? '').trim().isEmpty ? 'User' : (currentUsername ?? '').trim()}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
 
-                            style: **const** TextStyle(fontWeight: FontWeight.w700),
+                          ),
 
-                          ),
+                        ),
 
-                        ),
+                        TextButton.icon(
 
-                        TextButton.icon(
+                          onPressed: _openDataManagement,
 
-                          onPressed: \_openDataManagement,
+                          icon: const Icon(Icons.storage_outlined, size: 18),
 
-                          icon: **const** Icon(Icons.storage_outlined, size: 18),
+                          label: const Text('Data'),
 
-                          label: **const** Text('Data'),
+                        ),
 
-                        ),
+                      ],
 
-                      ],
+                    ),
 
-                    ),
+                  ),
 
-                  ),
+                  const SizedBox(height: 12),
 
-                  **const** SizedBox(height: 12),
+                  content,
 
-                  content,
+                ],
 
-                ],
+              ),
 
-              ),
+            ),
 
-            ),
+          ),
 
-          ),
+        );
 
-        );
+      },
 
-      },
+    );
 
-    );
+  }
 
-  }
+  Widget _screenOne(_FinancialSummary s) => _dashboardScrollable(
 
-  Widget \_screenOne(\_FinancialSummary s) => \_dashboardScrollable(
+        s,
 
-        s,
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
 
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _approvalBanner(),
 
-          \_approvalBanner(),
+          OutlinedButton.icon(
 
-          OutlinedButton.icon(
+            onPressed: _showPendingApprovals,
 
-            onPressed: \_showPendingApprovals,
+            icon: const Icon(Icons.pending_actions),
 
-            icon: **const** Icon(Icons.pending_actions),
+            label: const Text('View Unapproved Transactions'),
 
-            label: **const** Text('View Unapproved Transactions'),
+          ),
 
-          ),
+          const SizedBox(height: 10),
 
-          **const** SizedBox(height: 10),
+          _section('Receive Payment'),
 
-          \_section('Receive Payment'),
+          _buttonGrid([
 
-          \_buttonGrid([
+            _menu('Monthly Donation', Icons.people_alt_outlined, () => _push(HouseholdsPage(database: appDatabase))),
 
-            \_menu('Monthly Donation', Icons.people_alt_outlined, () => \_push(HouseholdsPage(database: appDatabase))),
+            _menu('General Donation', Icons.volunteer_activism_outlined, () => _push(FinancialEntryPage(database: appDatabase, title: 'General Donation', category: 'GD', receiptPrefix: 'GD', typeLabel: 'General Donation'))),
 
-            \_menu('General Donation', Icons.volunteer_activism_outlined, () => \_push(FinancialEntryPage(database: appDatabase, title: 'General Donation', category: 'GD', receiptPrefix: 'GD', typeLabel: 'General Donation'))),
+            _menu('Box Collection', Icons.inventory_2_outlined, () => _push(FinancialEntryPage(database: appDatabase, title: 'Box Collection', category: 'BD', receiptPrefix: 'BD', typeLabel: 'Box Collection'))),
 
-            \_menu('Box Collection', Icons.inventory_2_outlined, () => \_push(FinancialEntryPage(database: appDatabase, title: 'Box Collection', category: 'BD', receiptPrefix: 'BD', typeLabel: 'Box Collection'))),
+            _menu('Other Income', Icons.payments_outlined, () => _push(FinancialEntryPage(database: appDatabase, title: 'Other Income', category: 'OI', receiptPrefix: 'OI', typeLabel: 'Other Income'))),
 
-            \_menu('Other Income', Icons.payments_outlined, () => \_push(FinancialEntryPage(database: appDatabase, title: 'Other Income', category: 'OI', receiptPrefix: 'OI', typeLabel: 'Other Income'))),
+            _menu('Zakaat Received', Icons.account_balance_wallet_outlined, () => _push(FinancialEntryPage(database: appDatabase, title: 'Zakaat', category: 'ZK', receiptPrefix: 'ZK', typeLabel: 'Zakaat'))),
 
-            \_menu('Zakaat Received', Icons.account_balance_wallet_outlined, () => \_push(FinancialEntryPage(database: appDatabase, title: 'Zakaat', category: 'ZK', receiptPrefix: 'ZK', typeLabel: 'Zakaat'))),
+            _menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => _push(FinancialEntryPage(database: appDatabase, title: 'Sadqa-e-Fitr', category: 'SF', receiptPrefix: 'SF', typeLabel: 'Sadqa-e-Fitr'))),
 
-            \_menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => \_push(FinancialEntryPage(database: appDatabase, title: 'Sadqa-e-Fitr', category: 'SF', receiptPrefix: 'SF', typeLabel: 'Sadqa-e-Fitr'))),
+            _menu('Qarz-e-Hassanah', Icons.handshake_outlined, () => _push(QarzaHassanahPage(database: appDatabase))),
 
-            \_menu('Qarz-e-Hassanah', Icons.handshake_outlined, () => \_push(QarzaHassanahPage(database: appDatabase))),
+          ]),
 
-          ]),
+          const SizedBox(height: 22),
 
-          **const** SizedBox(height: 22),
+          _section('Record Expenditure'),
 
-          \_section('Record Expenditure'),
+          _buttonGrid([
 
-          \_buttonGrid([
+            _menu('Zakaat', Icons.volunteer_activism_outlined, () => _push(ZakaatExpenditurePage(database: appDatabase))),
 
-            \_menu('Zakaat', Icons.volunteer_activism_outlined, () => \_push(ZakaatExpenditurePage(database: appDatabase))),
+            _menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Sadqa-e-Fitr Expenditure', adjustmentType: 'SADQA_EXPENSE', prefix: 'SF-OUT', fundLabel: 'Sadqa-e-Fitr'))),
 
-            \_menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => \_push(FundExpensePage(database: appDatabase, title: 'Sadqa-e-Fitr Expenditure', adjustmentType: 'SADQA_EXPENSE', prefix: 'SF-OUT', fundLabel: 'Sadqa-e-Fitr'))),
+            _menu('Other Expense', Icons.receipt_long_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Other Expense', adjustmentType: 'OTHER_EXPENSE', prefix: 'EX', fundLabel: 'Donations'))),
 
-            \_menu('Other Expense', Icons.receipt_long_outlined, () => \_push(FundExpensePage(database: appDatabase, title: 'Other Expense', adjustmentType: 'OTHER_EXPENSE', prefix: 'EX', fundLabel: 'Donations'))),
+          ]),
 
-          ]),
+          const SizedBox(height: 18),
 
-          **const** SizedBox(height: 18),
+          _section("Today's Received"),
 
-          \_section("Today's Received"),
+          Row(children: [Expanded(child: _amountCard('Cash', s.todayCash)), const SizedBox(width: 10), Expanded(child: _amountCard('Bank Transfer', s.todayBank))]),
 
-          Row(children: [Expanded(child: \_amountCard('Cash', s.todayCash)), **const** SizedBox(width: 10), Expanded(child: \_amountCard('Bank Transfer', s.todayBank))]),
+          _amountCard('Total Collected', s.todayCash + s.todayBank),
 
-          \_amountCard('Total Collected', s.todayCash + s.todayBank),
+          const SizedBox(height: 16),
 
-          **const** SizedBox(height: 16),
+          const Center(child: Text('Swipe left → Current Available Funds', style: TextStyle(color: Colors.black54))),
 
-          **const** Center(child: Text('Swipe left → Current Available Funds', style: TextStyle(color: Colors.black54))),
+        ]),
 
-        ]),
+      );
 
-      );
+  Widget _screenTwo(_FinancialSummary s) => _dashboardScrollable(
 
-  Widget \_screenTwo(\_FinancialSummary s) => \_dashboardScrollable(
+        s,
 
-        s,
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
 
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _section('Current Available Funds'),
 
-          \_section('Current Available Funds'),
+          _fund('Donations', s.donationFund, () => _push(DonationsAccountsPage(database: appDatabase))),
 
-          \_fund('Donations', s.donationFund, () => \_push(DonationsAccountsPage(database: appDatabase))),
+          _fund('Zakaat', s.zakaat, () => _push(LedgerPage(database: appDatabase, title: 'Zakaat', account: 'ZAKAAT'))),
 
-          \_fund('Zakaat', s.zakaat, () => \_push(LedgerPage(database: appDatabase, title: 'Zakaat', account: 'ZAKAAT'))),
+          _fund('Sadqa-e-Fitr', s.sadqaFitr, () => _push(LedgerPage(database: appDatabase, title: 'Sadqa-e-Fitr', account: 'SADQA_FITR'))),
 
-          \_fund('Sadqa-e-Fitr', s.sadqaFitr, () => \_push(LedgerPage(database: appDatabase, title: 'Sadqa-e-Fitr', account: 'SADQA_FITR'))),
+          _fund('Total Available Funds', s.expectedTotal, () => _push(LedgerPage(database: appDatabase, title: 'Total Available Funds', account: 'TOTAL'))),
 
-          \_fund('Total Available Funds', s.expectedTotal, () => \_push(LedgerPage(database: appDatabase, title: 'Total Available Funds', account: 'TOTAL'))),
+          const SizedBox(height: 16),
 
-          **const** SizedBox(height: 16),
+          const Center(child: Text('Swipe left → Reconciliation', style: TextStyle(color: Colors.black54))),
 
-          **const** Center(child: Text('Swipe left → Reconciliation', style: TextStyle(color: Colors.black54))),
+        ]),
 
-        ]),
+      );
 
-      );
+  Widget _screenThree(_FinancialSummary s) {
 
-  Widget \_screenThree(\_FinancialSummary s) {
+    final actual = s.cashInHand + s.bankBalance;
 
-    **final** actual = s.cashInHand + s.bankBalance;
+    final difference = actual - s.expectedTotal;
 
-    **final** difference = actual - s.expectedTotal;
+    final balanced = difference.abs() < .005;
 
-    **final** balanced = difference.abs() < .005;
+    final color = balanced ? kBrandGreen : (difference < 0 ? Colors.red.shade700 : Colors.green.shade700);
 
-    **final** color = balanced ? kBrandGreen : (difference < 0 ? Colors.red.shade700 : Colors.green.shade700);
+    return _dashboardScrollable(
 
-    return \_dashboardScrollable(
+      s,
 
-      s,
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
 
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _section('Reconciliation'),
 
-        \_section('Reconciliation'),
+        _amountCard('Total Funds as per Ledgers', s.expectedTotal),
 
-        \_amountCard('Total Funds as per Ledgers', s.expectedTotal),
+        const SizedBox(height: 10),
 
-        **const** SizedBox(height: 10),
+        const Padding(
 
-        **const** Padding(
+          padding: EdgeInsets.only(bottom: 8),
 
-          padding: EdgeInsets.only(bottom: 8),
+          child: Text(
 
-          child: Text(
+            'Actual Cash & Bank',
 
-            'Actual Cash & Bank',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
 
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+          ),
 
-          ),
+        ),
 
-        ),
+        Row(
 
-        Row(
+          children: [
 
-          children: [
+            Expanded(
 
-            Expanded(
+              child: _amountCard(
 
-              child: \_amountCard(
+                'Cash in Hand',
 
-                'Cash in Hand',
+                s.cashInHand,
 
-                s.cashInHand,
+                onTap: () => _editActualBalance(
 
-                onTap: () => \_editActualBalance(
+                  'Cash in Hand',
 
-                  'Cash in Hand',
+                  s.cashInHand,
 
-                  s.cashInHand,
+                  s.bankBalance,
 
-                  s.bankBalance,
+                ),
 
-                ),
+                tapHint: 'Edit amount',
 
-                tapHint: 'Edit amount',
+              ),
 
-              ),
+            ),
 
-            ),
+            const SizedBox(width: 10),
 
-            **const** SizedBox(width: 10),
+            Expanded(
 
-            Expanded(
+              child: _amountCard(
 
-              child: \_amountCard(
+                'Bank Balance',
 
-                'Bank Balance',
+                s.bankBalance,
 
-                s.bankBalance,
+                onTap: () => _editActualBalance(
 
-                onTap: () => \_editActualBalance(
+                  'Bank Balance',
 
-                  'Bank Balance',
+                  s.bankBalance,
 
-                  s.bankBalance,
+                  s.cashInHand,
 
-                  s.cashInHand,
+                ),
 
-                ),
+                tapHint: 'Edit amount',
 
-                tapHint: 'Edit amount',
+              ),
 
-              ),
+            ),
 
-            ),
+          ],
 
-          ],
+        ),
 
-        ),
+        _amountCard('Actual Total', actual),
 
-        \_amountCard('Actual Total', actual),
+        Card(
 
-        Card(
+          child: Padding(
 
-          child: Padding(
+            padding: const EdgeInsets.all(16),
 
-            padding: **const** EdgeInsets.all(16),
+            child: Column(children: [
 
-            child: Column(children: [
+              Text(balanced ? 'BALANCED' : difference < 0 ? 'LESS THAN EXPECTED' : 'MORE THAN EXPECTED', style: TextStyle(color: color, fontSize: 19, fontWeight: FontWeight.bold)),
 
-              Text(balanced ? 'BALANCED' : difference < 0 ? 'LESS THAN EXPECTED' : 'MORE THAN EXPECTED', style: TextStyle(color: color, fontSize: 19, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
 
-              **const** SizedBox(height: 6),
+              Text(balanced ? '₹0.00' : '${difference > 0 ? '+' : '-'}₹${difference.abs().toStringAsFixed(2)}', style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
 
-              Text(balanced ? '₹0.00' : '${difference > 0 ? '+' : '-'}₹${difference.abs().toStringAsFixed(2)}', style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
+            ]),
 
-            ]),
+          ),
 
-          ),
+        ),
 
-        ),
+      ]),
 
-      ]),
+    );
 
-    );
+  }
 
-  }
+  Widget _section(String text) => AppSectionHeader(title: text);
 
-  Widget \_section(String text) => AppSectionHeader(title: text);
+  Widget _buttonGrid(List<Widget> children) => LayoutBuilder(
 
-  Widget \_buttonGrid(List\<Widget> children) => LayoutBuilder(
+        builder: (context, constraints) {
 
-        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth >= 900;
 
-          **final** isDesktop = constraints.maxWidth >= 900;
+          final columns = isDesktop ? 3 : 2;
 
-          **final** columns = isDesktop ? 3 : 2;
+          return GridView.count(
 
-          return GridView\.count(
+            physics: const NeverScrollableScrollPhysics(),
 
-            physics: **const** NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
 
-            shrinkWrap: true,
+            crossAxisCount: columns,
 
-            crossAxisCount: columns,
+            childAspectRatio: isDesktop ? 3.4 : 2.15,
 
-            childAspectRatio: isDesktop ? 3.4 : 2.15,
+            crossAxisSpacing: 12,
 
-            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
 
-            mainAxisSpacing: 12,
+            children: children,
 
-            children: children,
+          );
 
-          );
+        },
 
-        },
+      );
 
-      );
+  Widget _menu(String text, IconData icon, VoidCallback onTap) {
 
-  Widget \_menu(String text, IconData icon, VoidCallback onTap) {
+    final expense = {'Zakaat', 'Sadqa-e-Fitr', 'Other Expense'}.contains(text);
 
-    **final** expense = {'Zakaat', 'Sadqa-e-Fitr', 'Other Expense'}.contains(text);
+    return AppActionCard(title: text, icon: icon, onTap: onTap, destructive: expense);
 
-    return AppActionCard(title: text, icon: icon, onTap: onTap, destructive: expense);
+  }
 
-  }
+  Widget _fund(String title, double amount, VoidCallback onTap) => AppBalanceCard(title: title, amount: amount, onTap: onTap, prominent: title == 'Total Available Funds');
 
-  Widget \_fund(String title, double amount, VoidCallback onTap) => AppBalanceCard(title: title, amount: amount, onTap: onTap, prominent: title == 'Total Available Funds');
+  Widget _amountCard(
 
-  Widget \_amountCard(
+    String title,
 
-    String title,
+    double amount, {
 
-    double amount, {
+    VoidCallback? onTap,
 
-    VoidCallback? onTap,
+    String tapHint = 'View ledger',
 
-    String tapHint = 'View ledger',
+  }) => AppBalanceCard(
 
-  }) => AppBalanceCard(
+        title: title,
 
-        title: title,
+        amount: amount,
 
-        amount: amount,
+        onTap: onTap,
 
-        onTap: onTap,
+        tapHint: tapHint,
 
-        tapHint: tapHint,
-
-      );
+      );
 
 }
 
-class \_SwitchUserDialog extends StatefulWidget {
+class _SwitchUserDialog extends StatefulWidget {
 
-  **final** List\<String> users;
+  final List<String> users;
 
-  **final** String initialUser;
+  final String initialUser;
 
-  **const** \_SwitchUserDialog({**required** this.users, **required** this.initialUser});
+  const _SwitchUserDialog({required this.users, required this.initialUser});
 
-  **@override**
+  @override
 
-  State<\_SwitchUserDialog> createState() => \_SwitchUserDialogState();
+  State<_SwitchUserDialog> createState() => _SwitchUserDialogState();
 
 }
 
-class \_SwitchUserDialogState extends State<\_SwitchUserDialog> {
+class _SwitchUserDialogState extends State<_SwitchUserDialog> {
 
-  **late** String selected;
+  late String selected;
 
-  **late** **final** TextEditingController passwordController;
+  late final TextEditingController passwordController;
 
-  String? error;
+  String? error;
 
-  bool submitting = false;
+  bool submitting = false;
 
-  **@override**
+  @override
 
-  **void** initState() {
+  void initState() {
 
-    super.initState();
+    super.initState();
 
-    selected = widget.initialUser;
+    selected = widget.initialUser;
 
-    passwordController = TextEditingController();
+    passwordController = TextEditingController();
 
-  }
+  }
 
-  **@override**
+  @override
 
-  **void** dispose() {
+  void dispose() {
 
-    passwordController.dispose();
+    passwordController.dispose();
 
-    super.dispose();
+    super.dispose();
 
-  }
+  }
 
-  **void** \_submit() {
+  void _submit() {
 
-    if (submitting) return;
+    if (submitting) return;
 
-    if (selected.isEmpty) {
+    if (selected.isEmpty) {
 
-      setState(() => error = 'Please select a user.');
+      setState(() => error = 'Please select a user.');
 
-      return;
+      return;
 
-    }
+    }
 
-    if (!verifyUserPassword(selected, passwordController.text.trim())) {
+    if (!verifyUserPassword(selected, passwordController.text.trim())) {
 
-      setState(() => error = 'Incorrect password.');
+      setState(() => error = 'Incorrect password.');
 
-      return;
+      return;
 
-    }
+    }
 
-    *// Prevent a second submit while the text field is losing focus and the*
+    // Prevent a second submit while the text field is losing focus and the*
 
-    *// dialog route is being removed.*
+    // dialog route is being removed.*
 
-    setState(() => submitting = true);
+    setState(() => submitting = true);
 
-    FocusManager.instance.primaryFocus?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
 
-    WidgetsBinding.instance.addPostFrameCallback((\_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
 
-      if (!mounted) return;
+      if (!mounted) return;
 
-      Navigator.of(context, rootNavigator: true).pop(selected);
+      Navigator.of(context, rootNavigator: true).pop(selected);
 
-    });
+    });
 
-  }
+  }
 
-  **@override**
+  @override
 
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
 
-    return AlertDialog(
+    return AlertDialog(
 
-      title: **const** Text('Switch User'),
+      title: const Text('Switch User'),
 
-      content: SizedBox(
+      content: SizedBox(
 
-        width: 420,
+        width: 420,
 
-        child: SingleChildScrollView(
+        child: SingleChildScrollView(
 
-          child: Column(
+          child: Column(
 
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
 
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
 
-            children: [
+            children: [
 
-              **const** Text('Select User', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text('Select User', style: TextStyle(fontWeight: FontWeight.w700)),
 
-              **const** SizedBox(height: 6),
+              const SizedBox(height: 6),
 
-              if (widget.users.isEmpty)
+              if (widget.users.isEmpty)
 
-                **const** Text('No users available.')
+                const Text('No users available.')
 
-              else
+              else
 
-                ConstrainedBox(
+                ConstrainedBox(
 
-                  constraints: **const** BoxConstraints(maxHeight: 190),
+                  constraints: const BoxConstraints(maxHeight: 190),
 
-                  child: ListView\.builder(
+                  child: ListView.builder(
 
-                    shrinkWrap: true,
+                    shrinkWrap: true,
 
-                    itemCount: widget.users.length,
+                    itemCount: widget.users.length,
 
-                    itemBuilder: (\_, index) {
+                    itemBuilder: (_, index) {
 
-                      **final** user = widget.users[index];
+                      final user = widget.users[index];
 
-                      return RadioListTile\<String>(
+                      return RadioListTile<String>(
 
-                        dense: true,
+                        dense: true,
 
-                        contentPadding: EdgeInsets.zero,
+                        contentPadding: EdgeInsets.zero,
 
-                        title: Text(user),
+                        title: Text(user),
 
-                        value: user,
+                        value: user,
 
-                        groupValue: selected,
+                        groupValue: selected,
 
-                        onChanged: submitting
+                        onChanged: submitting
 
-                            ? null
+                            ? null
 
-                            : (value) {
+                            : (value) {
 
-                                if (value == null) return;
+                                if (value == null) return;
 
-                                setState(() {
+                                setState(() {
 
-                                  selected = value;
+                                  selected = value;
 
-                                  error = null;
+                                  error = null;
 
-                                  passwordController.clear();
+                                  passwordController.clear();
 
-                                });
+                                });
 
-                              },
+                              },
 
-                      );
+                      );
 
-                    },
+                    },
 
-                  ),
+                  ),
 
-                ),
+                ),
 
-              **const** SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-              TextField(
+              TextField(
 
-                controller: passwordController,
+                controller: passwordController,
 
-                enabled: !submitting,
+                enabled: !submitting,
 
-                obscureText: true,
+                obscureText: true,
 
-                maxLength: 4,
+                maxLength: 4,
 
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.number,
 
-                textInputAction: TextInputAction.done,
+                textInputAction: TextInputAction.done,
 
-                onSubmitted: (\_) => \_submit(),
+                onSubmitted: (_) => _submit(),
 
-                decoration: InputDecoration(
+                decoration: InputDecoration(
 
-                  labelText: 'Password',
+                  labelText: 'Password',
 
-                  errorText: error,
+                  errorText: error,
 
-                  border: **const** OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
 
-                  counterText: '',
+                  counterText: '',
 
-                ),
+                ),
 
-              ),
+              ),
 
-            ],
+            ],
 
-          ),
+          ),
 
-        ),
+        ),
 
-      ),
+      ),
 
-      actions: [
+      actions: [
 
-        TextButton(
+        TextButton(
 
-          onPressed: submitting ? null : () {
+          onPressed: submitting ? null : () {
 
-            FocusManager.instance.primaryFocus?.unfocus();
+            FocusManager.instance.primaryFocus?.unfocus();
 
-            Navigator.of(context, rootNavigator: true).pop();
+            Navigator.of(context, rootNavigator: true).pop();
 
-          },
+          },
 
-          child: **const** Text('Cancel'),
+          child: const Text('Cancel'),
 
-        ),
+        ),
 
-        FilledButton(
+        FilledButton(
 
-          onPressed: submitting ? null : \_submit,
+          onPressed: submitting ? null : _submit,
 
-          child: Text(submitting ? 'Switching...' : 'Switch'),
+          child: Text(submitting ? 'Switching...' : 'Switch'),
 
-        ),
+        ),
 
-      ],
+      ],
 
-    );
+    );
 
-  }
+  }
 
 }
 
-class \_FinancialSummary {
+class _FinancialSummary {
 
-  **final** double monthlyDonation;
+  final double monthlyDonation;
 
-  **final** double generalDonation;
+  final double generalDonation;
 
-  **final** double boxCollection;
+  final double boxCollection;
 
-  **final** double otherIncome;
+  final double otherIncome;
 
-  **final** double zakaat;
+  final double zakaat;
 
-  **final** double sadqaFitr;
+  final double sadqaFitr;
 
-  **final** double qarzaNet;
+  final double qarzaNet;
 
-  **final** double todayCash;
+  final double todayCash;
 
-  **final** double todayBank;
+  final double todayBank;
 
-  **final** double cashInHand;
+  final double cashInHand;
 
-  **final** double bankBalance;
+  final double bankBalance;
 
-  **final** double donationFund;
+  final double donationFund;
 
-  **final** double expectedTotal;
+  final double expectedTotal;
 
-  **const** \_FinancialSummary({
+  const _FinancialSummary({
 
-    **required** this.monthlyDonation,
+    required this.monthlyDonation,
 
-    **required** this.generalDonation,
+    required this.generalDonation,
 
-    **required** this.boxCollection,
+    required this.boxCollection,
 
-    **required** this.otherIncome,
+    required this.otherIncome,
 
-    **required** this.zakaat,
+    required this.zakaat,
 
-    **required** this.sadqaFitr,
+    required this.sadqaFitr,
 
-    **required** this.qarzaNet,
+    required this.qarzaNet,
 
-    **required** this.todayCash,
+    required this.todayCash,
 
-    **required** this.todayBank,
+    required this.todayBank,
 
-    **required** this.cashInHand,
+    required this.cashInHand,
 
-    **required** this.bankBalance,
+    required this.bankBalance,
 
-    **required** this.donationFund,
+    required this.donationFund,
 
-    **required** this.expectedTotal,
+    required this.expectedTotal,
 
-  });
+  });
 
 }
