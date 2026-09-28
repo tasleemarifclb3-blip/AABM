@@ -135,39 +135,51 @@ class _AlAminBackdrop extends StatelessWidget {
   const _AlAminBackdrop({this.child});
 
   @override
-
   Widget build(BuildContext context) {
-
-    return Stack(
-
-      fit: StackFit.expand,
-
-      children: [
-
-        Positioned.fill(
-
-          child: Image.asset(
-
-            'assets/BAckground.jpg',
-
-            fit: BoxFit.cover,
-
-            alignment: Alignment.center,
-
-            scale: 1.05,
-
-          ),
-
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFF7FAF8),
+            Color(0xFFEEF5F1),
+            Color(0xFFF8F5ED),
+          ],
         ),
-
-        child ?? const SizedBox.shrink(),
-
-      ],
-
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -120,
+            left: -90,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x141F7A68),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -110,
+            bottom: 80,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x12C9A84E),
+              ),
+            ),
+          ),
+          child ?? const SizedBox.shrink(),
+        ],
+      ),
     );
-
   }
-
 }
 
 class DashboardPage extends StatefulWidget {
@@ -1660,11 +1672,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
           _buttonGrid([
 
-            _menu('Zakaat', Icons.volunteer_activism_outlined, () => _push(ZakaatExpenditurePage(database: appDatabase))),
+            _menu('Zakaat', Icons.volunteer_activism_outlined, () => _push(ZakaatExpenditurePage(database: appDatabase)), destructive: true),
 
-            _menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Sadqa-e-Fitr Expenditure', adjustmentType: 'SADQA_EXPENSE', prefix: 'SF-OUT', fundLabel: 'Sadqa-e-Fitr'))),
+            _menu('Sadqa-e-Fitr', Icons.card_giftcard_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Sadqa-e-Fitr Expenditure', adjustmentType: 'SADQA_EXPENSE', prefix: 'SF-OUT', fundLabel: 'Sadqa-e-Fitr')), destructive: true),
 
-            _menu('Other Expense', Icons.receipt_long_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Other Expense', adjustmentType: 'OTHER_EXPENSE', prefix: 'EX', fundLabel: 'Donations'))),
+            _menu('Other Expense', Icons.receipt_long_outlined, () => _push(FundExpensePage(database: appDatabase, title: 'Other Expense', adjustmentType: 'OTHER_EXPENSE', prefix: 'EX', fundLabel: 'Donations')), destructive: true),
 
           ]),
 
@@ -1862,12 +1874,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
       );
 
-  Widget _menu(String text, IconData icon, VoidCallback onTap) {
-
-    final expense = {'Zakaat', 'Sadqa-e-Fitr', 'Other Expense'}.contains(text);
-
-    return AppActionCard(title: text, icon: icon, onTap: onTap, destructive: expense);
-
+  Widget _menu(
+    String text,
+    IconData icon,
+    VoidCallback onTap, {
+    bool destructive = false,
+  }) {
+    return AppActionCard(
+      title: text,
+      icon: icon,
+      onTap: onTap,
+      destructive: destructive,
+    );
   }
 
   Widget _fund(String title, double amount, VoidCallback onTap) => AppBalanceCard(title: title, amount: amount, onTap: onTap, prominent: title == 'Total Available Funds');
