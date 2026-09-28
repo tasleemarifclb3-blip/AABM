@@ -776,17 +776,17 @@ class AppDesktopSidebar extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          \_item(context, 'Dashboard', Icons.home_outlined, onDashboard),
+          _item(context, 'Dashboard', Icons.home_outlined, onDashboard),
 
-          \_item(context, 'Receive\nPayment', Icons.account_balance_wallet_outlined, onReceive),
+          _item(context, 'Receive\nPayment', Icons.account_balance_wallet_outlined, onReceive),
 
-          \_item(context, 'Issue Qarza', Icons.handshake_outlined, onIssueQarza),
+          _item(context, 'Issue Qarza', Icons.handshake_outlined, onIssueQarza),
 
-          \_item(context, 'Reports', Icons.bar_chart_outlined, onReports),
+          _item(context, 'Reports', Icons.bar_chart_outlined, onReports),
 
           const Spacer(),
 
-          \_item(context, 'Settings', Icons.settings_outlined, onSettings),
+          _item(context, 'Settings', Icons.settings_outlined, onSettings),
 
           const SizedBox(height: 12),
 
@@ -798,7 +798,7 @@ class AppDesktopSidebar extends StatelessWidget {
 
   }
 
-  Widget \_item(BuildContext context, String label, IconData icon, VoidCallback? onTap) {
+  Widget _item(BuildContext context, String label, IconData icon, VoidCallback? onTap) {
 
     final active = selected == label;
 
